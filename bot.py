@@ -266,8 +266,47 @@ async def handle_text_message(message: types.Message, bot: Bot):
         }
         await process_generation_request(message, bot, data)
 
+async def progress_reporter(bot: Bot, chat_id: int, message_id: int, stop_event: asyncio.Event, topic: str):
+    """Asynchronously animates live generation progress bar in Telegram."""
+    stages = [
+        ("▰▱▱▱▱▱▱▱▱▱", "10%", "Инициализирую стандарты МГЭИ им. А.Д. Сахарова..."),
+        ("▰▰▱▱▱▱▱▱▱▱", "25%", "Проектирую структуру и введение (цель, задачи)..."),
+        ("▰▰▰▱▱▱▱▱▱▱", "40%", "Пишу теоретическую часть в стиле Anti-AI..."),
+        ("▰▰▰▰▱▱▱▱▱▱", "55%", "Анализирую практическую часть и нормативную базу РБ..."),
+        ("▰▰▰▰▰▱▱▱▱▱", "70%", "Формулирую выводы и библиографию по ГОСТ..."),
+        ("▰▰▰▰▰▰▱▱▱▱", "80%", "Подбираю научные иллюстрации и схемы..."),
+        ("▰▰▰▰▰▰▰▱▱▱", "90%", "Верстаю официальный титульный лист и документ..."),
+    ]
+    idx = 0
+    while not stop_event.is_set():
+        bar, pct, desc = stages[idx % len(stages)]
+        try:
+            await bot.send_chat_action(chat_id, action="upload_document")
+            text = (
+                f"⚙️ **Генерация работы по стандартам МГЭИ им. А.Д. Сахарова:**\n\n"
+                f"📌 **Тема:** «{topic[:80]}»\n\n"
+                f"[{bar}] **{pct}**\n"
+                f"🔄 {desc}"
+            )
+            await bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=message_id,
+                text=text,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception:
+            pass
+
+        if idx < len(stages) - 1:
+            idx += 1
+
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=3.5)
+        except asyncio.TimeoutError:
+            pass
+
 async def process_generation_request(message: types.Message, bot: Bot, params: Dict[str, Any]):
-    """Execute end-to-end generation of DOCX and/or PPTX."""
+    """Execute end-to-end generation of DOCX and/or PPTX with live visual progress."""
     user_id = message.from_user.id
     session = SessionManager.get_session(user_id)
 
@@ -277,8 +316,15 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
 
     status_msg = await message.answer(
         f"⏳ **Генерация работы по стандартам МГЭИ им. А.Д. Сахарова:**\n\n"
-        f"Тема: «{topic}»\n"
-        f"1️⃣ Составляю академическую структуру и пишу текст (стиль Anti-AI)..."
+        f"📌 **Тема:** «{topic[:80]}»\n\n"
+        f"[▰▱▱▱▱▱▱▱▱▱] **10%**\n"
+        f"⚙️ Запускаю академическую генерацию...",
+        parse_mode=ParseMode.MARKDOWN
+    )
+
+    stop_event = asyncio.Event()
+    progress_task = asyncio.create_task(
+        progress_reporter(bot, message.chat.id, status_msg.message_id, stop_event, topic)
     )
 
     try:
@@ -310,11 +356,6 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
 
         # 2. Generate PPTX data if requested
         if work_type in ["pres", "bundle"]:
-            await status_msg.edit_text(
-                f"⏳ **Генерация работы по стандартам МГЭИ им. А.Д. Сахарова:**\n\n"
-                f"Тема: «{topic}»\n"
-                f"2️⃣ Проектирую слайды презентации и готовлю речь докладчика..."
-            )
             pres_prompt = build_presentation_prompt(
                 topic=topic,
                 discipline=params.get("discipline", "Экологический мониторинг"),
@@ -334,11 +375,6 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
 
         # 3. Collect Image Queries & Fetch/Generate Images
         if include_images:
-            await status_msg.edit_text(
-                f"⏳ **Генерация работы по стандартам МГЭИ им. А.Д. Сахарова:**\n\n"
-                f"Тема: «{topic}»\n"
-                f"3️⃣ Подбираю научные иллюстрации и схемы по ГОСТу..."
-            )
             queries = set()
             if doc_data:
                 for sec in doc_data.get("sections", []):
@@ -350,19 +386,13 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
                     if slide.get("image_query"):
                         queries.add(slide["image_query"])
 
-            for q in list(queries)[:5]:  # Limit to 5 images for speed & relevance
+            for q in list(queries)[:4]:  # Fetch up to 4 images
                 img_path = await ImageService.get_image_for_query(q)
                 if img_path:
                     image_map[q] = img_path
                     session.current_image_map[q] = str(img_path)
 
-        # 4. Compile Documents
-        await status_msg.edit_text(
-            f"⏳ **Генерация работы по стандартам МГЭИ им. А.Д. Сахарова:**\n\n"
-            f"Тема: «{topic}»\n"
-            f"4️⃣ Верстаю готовые файлы .docx и .pptx..."
-        )
-
+        # 4. Final Document Building
         docx_path = None
         pptx_path = None
 
@@ -378,7 +408,20 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
         session.revision_count = 1
         SessionManager.save_session(user_id)
 
-        await status_msg.delete()
+        # Stop progress animation and show 100%
+        stop_event.set()
+        await progress_task
+
+        try:
+            await status_msg.edit_text(
+                f"✅ **Генерация успешно завершена!**\n\n"
+                f"📌 Тема: «{topic}»\n"
+                f"[▰▰▰▰▰▰▰▰▰▰] **100%**\n"
+                f"🚀 Отправляю готовые файлы в чат...",
+                parse_mode=ParseMode.MARKDOWN
+            )
+        except Exception:
+            pass
 
         # Send Files to Telegram
         keyboard = get_actions_inline_keyboard(has_doc=bool(docx_path), has_pres=bool(pptx_path))
@@ -415,6 +458,7 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
             )
 
     except Exception as e:
+        stop_event.set()
         logger.error(f"Generation error: {e}", exc_info=True)
         await status_msg.edit_text(f"❌ Произошла ошибка при генерации: {e}\n\nПопробуйте повторить или проверьте ключ API.")
 

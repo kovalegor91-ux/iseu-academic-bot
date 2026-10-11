@@ -3,21 +3,43 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Конструктор работ МГЭИ им. А.Д. Сахарова</title>
+  <title>Конструктор работ МГЭИ им. А.Д. Сахарова БГУ</title>
   <link rel="stylesheet" href="style.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
   <div class="container">
     <div class="header">
+      <div class="header-badge">СТАНДАРТЫ МГЭИ И ГОСТ РБ</div>
       <h1>МГЭИ им. А.Д. Сахарова БГУ</h1>
-      <p>Генератор рефератов, докладов и презентаций по ГОСТ</p>
+      <p>Генератор готовых рефератов, докладов и презентаций</p>
     </div>
 
-    <!-- Тип работы -->
+    <!-- Быстрые темы -->
     <div class="card">
       <div class="section-title">
-        <span>📄</span> Выберите тип работы
+        <span>💡</span> Быстрые темы (нажмите для выбора)
+      </div>
+      <div class="chips-container">
+        <div class="chip" onclick="setTopic('Опухоли щитовидной железы. Этиология, патогенез, клинические проявления и диагностика', 'Экологическая медицина')">
+          🩺 Опухоли щитовидной железы
+        </div>
+        <div class="chip" onclick="setTopic('Радиационный мониторинг и радиологическая обстановка в Республике Беларусь', 'Радиобиология')">
+          ☢️ Радиационный мониторинг РБ
+        </div>
+        <div class="chip" onclick="setTopic('Методы биологической индикации качества атмосферного воздуха урбанизированных территорий', 'Экологический мониторинг')">
+          🌿 Биоиндикация воздуха
+        </div>
+        <div class="chip" onclick="setTopic('Современные подходы к обезвреживанию и утилизации медицинских отходов', 'Общая экология')">
+          ♻️ Утилизация медотходов
+        </div>
+      </div>
+    </div>
+
+    <!-- Тип работы и тема -->
+    <div class="card">
+      <div class="section-title">
+        <span>📄</span> Тип работы и тема
       </div>
       <div class="work-types">
         <div class="work-type-btn active" data-type="doc" onclick="selectType('doc', this)">
@@ -36,7 +58,7 @@
 
       <div class="form-group">
         <label for="topic">Тема работы *</label>
-        <textarea id="topic" rows="2" placeholder="Например: Методы биологической очистки сточных вод урбанизированных территорий" required></textarea>
+        <textarea id="topic" rows="3" placeholder="Введите или выберите тему работы выше..." required></textarea>
       </div>
 
       <div class="form-group">
@@ -48,10 +70,10 @@
     <!-- Университет и кафедра -->
     <div class="card">
       <div class="section-title">
-        <span>🏛️</span> Кафедра и факультет МГЭИ
+        <span>🏛️</span> Факультет и кафедра
       </div>
       <div class="form-group">
-        <label for="faculty">Факультет</label>
+        <label for="faculty">Факультет МГЭИ</label>
         <select id="faculty" onchange="updateDepartments()">
           <option value="Факультет мониторинга окружающей среды">Факультет мониторинга окружающей среды (ФМОС)</option>
           <option value="Факультет экологической медицины">Факультет экологической медицины (ФЭМ)</option>
@@ -60,29 +82,50 @@
 
       <div class="form-group">
         <label for="department">Кафедра</label>
-        <select id="department">
+        <select id="department" onchange="toggleCustomDept()">
           <!-- Populated by JS -->
         </select>
+      </div>
+
+      <div class="form-group" id="customDeptGroup" style="display: none;">
+        <label for="custom_department">Своя кафедра (вручную)</label>
+        <input type="text" id="custom_department" placeholder="Введите название кафедры...">
       </div>
     </div>
 
     <!-- Автор и руководитель -->
     <div class="card">
       <div class="section-title">
-        <span>👤</span> Данные для титульного листа
+        <span>👤</span> Титульный лист (автор и руководитель)
       </div>
-      <div class="grid-3 form-group">
+      <div class="grid-2 form-group">
         <div>
           <label for="student_name">ФИО студента</label>
           <input type="text" id="student_name" placeholder="Иванов И.И." value="Иванов И.И.">
         </div>
         <div>
+          <label for="education_form">Форма обучения</label>
+          <select id="education_form">
+            <option value="дневной">Дневная (очная)</option>
+            <option value="заочной">Заочная</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid-2 form-group">
+        <div>
           <label for="student_course">Курс</label>
-          <input type="number" id="student_course" value="3" min="1" max="5">
+          <select id="student_course">
+            <option value="1">1 курс</option>
+            <option value="2">2 курс</option>
+            <option value="3" selected>3 курс</option>
+            <option value="4">4 курс</option>
+            <option value="Магистратура">Магистратура</option>
+          </select>
         </div>
         <div>
           <label for="student_group">Группа</label>
-          <input type="text" id="student_group" value="301">
+          <input type="text" id="student_group" value="301" placeholder="301">
         </div>
       </div>
 
@@ -92,15 +135,15 @@
       </div>
     </div>
 
-    <!-- Настройки качества и объема -->
+    <!-- Детальные параметры работы -->
     <div class="card">
       <div class="section-title">
-        <span>⚙️</span> Параметры генерации
+        <span>⚙️</span> Детальные параметры документа
       </div>
 
       <div class="grid-2 form-group" id="volumeGroup">
         <div>
-          <label for="page_count">Страниц DOCX</label>
+          <label for="page_count">Объем DOCX (стр.)</label>
           <input type="number" id="page_count" value="15" min="5" max="35">
         </div>
         <div>
@@ -109,10 +152,27 @@
         </div>
       </div>
 
+      <div class="grid-2 form-group">
+        <div>
+          <label for="chapters_count">Количество глав</label>
+          <select id="chapters_count">
+            <option value="2" selected>2 главы (Теория + Практика)</option>
+            <option value="3">3 главы (Теория + Анализ + Решения)</option>
+          </select>
+        </div>
+        <div>
+          <label for="complexity_level">Уровень работы</label>
+          <select id="complexity_level">
+            <option value="standard" selected>Стандартный академический</option>
+            <option value="advanced">Углубленный научный</option>
+          </select>
+        </div>
+      </div>
+
       <div class="toggle-group">
         <div class="toggle-info">
           <div class="toggle-title">🖼️ Иллюстрации и схемы <span class="badge">ГОСТ</span></div>
-          <div class="toggle-desc">Поиск научных схем в сети + AI генерация с подписями по ГОСТ</div>
+          <div class="toggle-desc">Поиск научных схем + AI с автоподписями «Рисунок 1 — ...»</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="include_images" checked>
@@ -122,8 +182,8 @@
 
       <div class="toggle-group">
         <div class="toggle-info">
-          <div class="toggle-title">🛡️ Человеческий язык <span class="badge">Анти-AI</span></div>
-          <div class="toggle-desc">Защита от детекторов ИИ: естественный стиль студента Сахарова</div>
+          <div class="toggle-title">🛡️ Человеческий язык <span class="badge">Anti-AI</span></div>
+          <div class="toggle-desc">Защита от антиплагиата: без клише, белорусская нормативная база</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="anti_ai_style" checked>
@@ -134,16 +194,28 @@
       <div class="toggle-group">
         <div class="toggle-info">
           <div class="toggle-title">🎤 Речь для защиты</div>
-          <div class="toggle-desc">Готовый текст доклада студента и заметки к каждому слайду</div>
+          <div class="toggle-desc">Готовый текст доклада и Speaker Notes к каждому слайду</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="generate_speech" checked>
           <span class="slider"></span>
         </label>
       </div>
+
+      <div class="toggle-group">
+        <div class="toggle-info">
+          <div class="toggle-title">📚 Литература ВАК РБ</div>
+          <div class="toggle-desc">Список источников строго по ГОСТ 7.1-2003 со ссылками [1, с. 24]</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="gost_bibliography" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
     </div>
 
-    <button type="button" class="submit-btn" onclick="submitForm()">
+    <!-- Кнопка генерации -->
+    <button type="button" class="submit-btn" id="submitBtn" onclick="submitForm()">
       <span>✨</span> Сгенерировать работу
     </button>
   </div>
@@ -155,14 +227,16 @@
         "Кафедра общей экологии",
         "Кафедра экологических информационных систем",
         "Кафедра энергоэффективных технологий",
-        "Кафедра физики и высшей математики"
+        "Кафедра физики и высшей математики",
+        "Другая кафедра (ввести вручную)"
       ],
       "Факультет экологической медицины": [
         "Кафедра экологической медицины и радиобиологии",
         "Кафедра иммунологии",
         "Кафедра биохимии и биофизики",
         "Кафедра экологической и молекулярной генетики",
-        "Кафедра социально-гуманитарных наук и устойчивого развития"
+        "Кафедра социально-гуманитарных наук и устойчивого развития",
+        "Другая кафедра (ввести вручную)"
       ]
     };
 
@@ -179,6 +253,25 @@
         opt.textContent = d;
         deptSelect.appendChild(opt);
       });
+      toggleCustomDept();
+    }
+
+    function toggleCustomDept() {
+      const deptSelect = document.getElementById("department");
+      const customGroup = document.getElementById("customDeptGroup");
+      if (deptSelect.value === "Другая кафедра (ввести вручную)") {
+        customGroup.style.display = "block";
+      } else {
+        customGroup.style.display = "none";
+      }
+    }
+
+    function setTopic(topic, discipline) {
+      document.getElementById("topic").value = topic;
+      if (discipline) {
+        document.getElementById("discipline").value = discipline;
+      }
+      document.getElementById("topic").focus();
     }
 
     function selectType(type, element) {
@@ -203,28 +296,47 @@
         return;
       }
 
+      let department = document.getElementById("department").value;
+      if (department === "Другая кафедра (ввести вручную)") {
+        const customDept = document.getElementById("custom_department").value.trim();
+        department = customDept || "Кафедра экологического мониторинга";
+      }
+
+      const btn = document.getElementById("submitBtn");
+      btn.disabled = true;
+      btn.innerHTML = "<span>⏳</span> Передаю параметры боту...";
+
       const payload = {
         action: "generate",
         work_type: selectedType,
         topic: topic,
-        discipline: document.getElementById("discipline").value.trim(),
+        discipline: document.getElementById("discipline").value.trim() || "Экологический мониторинг",
         faculty: document.getElementById("faculty").value,
-        department: document.getElementById("department").value,
-        student_name: document.getElementById("student_name").value.trim(),
+        department: department,
+        student_name: document.getElementById("student_name").value.trim() || "Иванов И.И.",
+        education_form: document.getElementById("education_form").value,
         student_course: document.getElementById("student_course").value,
-        student_group: document.getElementById("student_group").value.trim(),
-        supervisor: document.getElementById("supervisor").value.trim(),
+        student_group: document.getElementById("student_group").value.trim() || "301",
+        supervisor: document.getElementById("supervisor").value.trim() || "доцент Петров П.П.",
         page_count: parseInt(document.getElementById("page_count").value) || 15,
         slide_count: parseInt(document.getElementById("slide_count").value) || 8,
+        chapters_count: parseInt(document.getElementById("chapters_count").value) || 2,
+        complexity_level: document.getElementById("complexity_level").value,
         include_images: document.getElementById("include_images").checked,
         anti_ai_style: document.getElementById("anti_ai_style").checked,
-        generate_speech: document.getElementById("generate_speech").checked
+        generate_speech: document.getElementById("generate_speech").checked,
+        gost_bibliography: document.getElementById("gost_bibliography").checked
       };
 
       if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.sendData) {
         window.Telegram.WebApp.sendData(JSON.stringify(payload));
+        setTimeout(() => {
+          window.Telegram.WebApp.close();
+        }, 300);
       } else {
-        alert("Данные для генерации сформированы:\n\n" + JSON.stringify(payload, null, 2));
+        alert("Параметры отправлены:\n\n" + JSON.stringify(payload, null, 2));
+        btn.disabled = false;
+        btn.innerHTML = "<span>✨</span> Сгенерировать работу";
       }
     }
 

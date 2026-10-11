@@ -123,10 +123,12 @@ class GeminiClient:
                                 if not parts:
                                     raise ValueError("Ответ Gemini не содержит текстовых блоков.")
                                 return "".join(p.get("text", "") for p in parts)
-                            elif response.status == 429:
-                                logger.warning(f"Rate limit 429 on model {model}, attempt {attempt+1}. Retrying...")
-                                await asyncio.sleep(2 * (attempt + 1))
-                                continue
+                            elif response.status in (429, 503):
+                                logger.warning(f"Status {response.status} on model {model}, attempt {attempt+1}. Falling back to next model...")
+                                if attempt == 0:
+                                    await asyncio.sleep(1)
+                                    continue
+                                break
                             else:
                                 error_text = await response.text()
                                 logger.warning(f"Error {response.status} from {model}: {error_text}")

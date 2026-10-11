@@ -33,16 +33,28 @@ body {
 
 .header {
   text-align: center;
-  margin-bottom: 20px;
-  padding: 16px;
+  margin-bottom: 16px;
+  padding: 18px 16px;
   background: linear-gradient(135deg, var(--primary), var(--accent));
   color: white;
   border-radius: var(--radius);
   box-shadow: 0 4px 12px rgba(18, 59, 47, 0.15);
 }
 
+.header-badge {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
 .header h1 {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 700;
   margin-bottom: 4px;
 }
@@ -56,13 +68,13 @@ body {
   background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px;
-  margin-bottom: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
 }
 
 .section-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--primary);
   margin-bottom: 12px;
@@ -71,8 +83,31 @@ body {
   gap: 8px;
 }
 
+.chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  background: #f0f5f2;
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text);
+}
+
+.chip:hover {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .form-group {
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .form-group:last-child {
@@ -81,9 +116,9 @@ body {
 
 label {
   display: block;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  margin-bottom: 6px;
+  margin-bottom: 5px;
   color: var(--text);
 }
 
@@ -95,7 +130,7 @@ textarea {
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   background: #fafcfb;
   color: var(--text);
   transition: border-color 0.2s, box-shadow 0.2s;
@@ -114,17 +149,17 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .work-type-btn {
-  padding: 12px 8px;
+  padding: 10px 6px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #fafcfb;
   cursor: pointer;
   text-align: center;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   transition: all 0.2s;
 }
@@ -140,12 +175,6 @@ textarea:focus {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-}
-
-.grid-3 {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  gap: 8px;
 }
 
 .toggle-group {
@@ -165,21 +194,21 @@ textarea:focus {
 }
 
 .toggle-title {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .toggle-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
 }
 
 .switch {
   position: relative;
   display: inline-block;
-  width: 44px;
-  height: 24px;
-  margin-left: 12px;
+  width: 42px;
+  height: 22px;
+  margin-left: 10px;
 }
 
 .switch input {
@@ -197,14 +226,14 @@ textarea:focus {
   bottom: 0;
   background-color: #ccc;
   transition: 0.3s;
-  border-radius: 24px;
+  border-radius: 22px;
 }
 
 .slider:before {
   position: absolute;
   content: "";
-  height: 18px;
-  width: 18px;
+  height: 16px;
+  width: 16px;
   left: 3px;
   bottom: 3px;
   background-color: white;
@@ -227,32 +256,35 @@ input:checked + .slider:before {
   color: white;
   border: none;
   border-radius: var(--radius);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s, transform 0.1s;
+  transition: all 0.2s;
   box-shadow: 0 4px 12px rgba(46, 125, 50, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  margin-bottom: 20px;
 }
 
 .submit-btn:hover {
   background: #256629;
 }
 
-.submit-btn:active {
-  transform: scale(0.99);
+.submit-btn:disabled {
+  background: #7ca880;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .badge {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 1px 6px;
   background: var(--accent-light);
   color: var(--accent);
-  font-size: 11px;
-  font-weight: 600;
-  border-radius: 6px;
-  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 4px;
+  margin-left: 4px;
 }
