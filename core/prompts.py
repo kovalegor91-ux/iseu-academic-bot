@@ -36,7 +36,10 @@ def build_doc_generation_prompt(
     supervisor: str = "доцент, к.б.н. Петров П.П.",
     page_count: int = 15,
     include_images: bool = True,
-    reference_data: Optional[Dict[str, Any]] = None
+    reference_data: Optional[Dict[str, Any]] = None,
+    custom_rules: str = "",
+    no_subsections: bool = False,
+    no_appendix: bool = False
 ) -> str:
     """Prompt to generate structured JSON for DOCX document."""
     ref_instruction = ""
@@ -47,6 +50,14 @@ def build_doc_generation_prompt(
 - Фрагмент стиля из образца:
 {reference_data.get('sample_text', '')[:1200]}
 """
+
+    rules_instruction = ""
+    if custom_rules:
+        rules_instruction += f"\nИНДИВИДУАЛЬНЫЕ УСЛОВИЯ И ПРАВИЛА ПОЛЬЗОВАТЕЛЯ:\n{custom_rules}\n(ОБЯЗАТЕЛЬНО строго соблюдай эти правила!)\n"
+    if no_subsections:
+        rules_instruction += "\nТРЕБОВАНИЕ К СТРУКТУРЕ: НЕ создавай подразделы (1.1, 1.2). Каждая глава должна представлять собой единый непрерывный текст без разделения на подпункты!\n"
+    if no_appendix:
+        rules_instruction += "\nТРЕБОВАНИЕ К ПРИЛОЖЕНИЯМ: НЕ создавай приложение А и речь для защиты (поле speech_text оставь пустым).\n"
 
     image_instruction = """
 Для каждого ключевого подраздела, где уместна иллюстрация, схема, график или таблица, укажи:
@@ -70,6 +81,8 @@ def build_doc_generation_prompt(
 - Желаемый объем: приблизительно {page_count} страниц (напиши развернутые, глубокие параграфы без воды).
 
 {ref_instruction}
+
+{rules_instruction}
 
 {image_instruction}
 
@@ -178,7 +191,8 @@ def build_presentation_prompt(
     slide_count: int = 8,
     include_images: bool = True,
     doc_context: Optional[Dict[str, Any]] = None,
-    reference_data: Optional[Dict[str, Any]] = None
+    reference_data: Optional[Dict[str, Any]] = None,
+    custom_rules: str = ""
 ) -> str:
     """Prompt to generate structured JSON for PPTX presentation."""
     context_str = ""
@@ -201,6 +215,14 @@ def build_presentation_prompt(
 Постарайся перенять тон, визуальную емкость и стиль подачи из образца.
 """
 
+    rules_str = ""
+    if custom_rules:
+        rules_str = f"""
+ИНДИВИДУАЛЬНЫЕ УСЛОВИЯ И ПРАВИЛА ПОЛЬЗОВАТЕЛЯ:
+{custom_rules}
+(ОБЯЗАТЕЛЬНО строго соблюдай эти правила при формировании слайдов!)
+"""
+
     return f"""
 Создай профессиональную университетскую презентацию (16:9) для МГЭИ им. А.Д. Сахарова БГУ по теме: «{topic}».
 Дисциплина: {discipline}
@@ -211,6 +233,7 @@ def build_presentation_prompt(
 
 {context_str}
 {ref_str}
+{rules_str}
 
 ТРЕБОВАНИЯ К СЛАЙДАМ:
 1. Презентация не должна быть перегружена текстом: 3-5 емких тезисов/пунктов на слайд.

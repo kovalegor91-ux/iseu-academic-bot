@@ -125,7 +125,7 @@ def push_project_to_github(github_token: str, repo_name: str = "iseu-academic-bo
     # 7. Create Commit
     print("Создаю коммит...")
     commit_payload = {
-        "message": "Deploy ISEU Academic Bot with WebApp and Render.com support",
+        "message": "Add dynamic Word TOC, persistent custom rules, and base64 reference upload in WebApp",
         "tree": tree_sha,
         "parents": parent_commits
     }

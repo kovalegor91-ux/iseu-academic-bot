@@ -17,6 +17,9 @@ class UserSession:
         self.current_image_map: Dict[str, str] = {}
         self.revision_count: int = 0
         self.last_mode: str = "doc"  # 'doc', 'pres', 'bundle'
+        self.custom_rules: str = ""
+        self.no_subsections: bool = False
+        self.no_appendix: bool = False
         self.params: Dict[str, Any] = {
             "faculty": "Факультет мониторинга окружающей среды",
             "department": "Кафедра экологического мониторинга",
@@ -39,6 +42,9 @@ class UserSession:
             "current_image_map": self.current_image_map,
             "revision_count": self.revision_count,
             "last_mode": self.last_mode,
+            "custom_rules": self.custom_rules,
+            "no_subsections": self.no_subsections,
+            "no_appendix": self.no_appendix,
             "params": self.params
         }
 
@@ -53,6 +59,9 @@ class UserSession:
         sess.current_image_map = data.get("current_image_map", {})
         sess.revision_count = data.get("revision_count", 0)
         sess.last_mode = data.get("last_mode", "doc")
+        sess.custom_rules = data.get("custom_rules", "")
+        sess.no_subsections = data.get("no_subsections", False)
+        sess.no_appendix = data.get("no_appendix", False)
         sess.params = data.get("params", sess.params)
         return sess
 

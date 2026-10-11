@@ -214,6 +214,59 @@
       </div>
     </div>
 
+    <!-- Особые требования и файл-образец -->
+    <div class="card">
+      <div class="section-title">
+        <span>🎯</span> Ваши особые условия и образец
+      </div>
+
+      <div class="toggle-group">
+        <div class="toggle-info">
+          <div class="toggle-title">🚫 Без подпунктов</div>
+          <div class="toggle-desc">Писать главы сплошным текстом без разделов 1.1, 1.2</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="no_subsections">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="toggle-group">
+        <div class="toggle-info">
+          <div class="toggle-title">🚫 Без приложений</div>
+          <div class="toggle-desc">Не добавлять речь докладчика и приложение в конец DOCX</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="no_appendix">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="form-group" style="margin-top: 10px;">
+        <label for="custom_rules">Индивидуальные требования к содержанию</label>
+        <textarea id="custom_rules" rows="2" placeholder="Например: без таблиц, больше расчетов, акцент на этиологию, использовать законы РБ..."></textarea>
+      </div>
+
+      <div class="form-group">
+        <label>📁 Документ-образец (.docx / .pptx) для клонирования стиля</label>
+        <div class="file-upload-box" onclick="document.getElementById('refFileInput').click()">
+          <span id="fileUploadText">📎 Нажмите, чтобы прикрепить образец</span>
+          <input type="file" id="refFileInput" accept=".docx,.pptx" style="display: none;" onchange="handleFileSelect(this)">
+        </div>
+      </div>
+
+      <div class="toggle-group" style="border-bottom: none; padding-top: 4px;">
+        <div class="toggle-info">
+          <div class="toggle-title">💾 Запомнить эти правила</div>
+          <div class="toggle-desc">Автоматически применять ко всем моим работам</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="save_rules_pref" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
     <!-- Кнопка генерации -->
     <button type="button" class="submit-btn" id="submitBtn" onclick="submitForm()">
       <span>✨</span> Сгенерировать работу
@@ -241,6 +294,23 @@
     };
 
     let selectedType = "doc";
+    let selectedRefFile = null;
+
+    function handleFileSelect(input) {
+      if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const b64 = e.target.result.split(',')[1];
+          selectedRefFile = {
+            filename: file.name,
+            base64: b64
+          };
+          document.getElementById("fileUploadText").innerHTML = "✅ Образец прикреплен: <b>" + file.name + "</b>";
+        };
+        reader.readAsDataURL(file);
+      }
+    }
 
     function updateDepartments() {
       const fac = document.getElementById("faculty").value;
@@ -286,6 +356,22 @@
         tg.expand();
         tg.ready();
       }
+
+      // Restore saved user preferences from localStorage
+      try {
+        const savedRules = localStorage.getItem("iseu_custom_rules");
+        if (savedRules) document.getElementById("custom_rules").value = savedRules;
+        if (localStorage.getItem("iseu_no_subsections") === "true") {
+          document.getElementById("no_subsections").checked = true;
+        }
+        if (localStorage.getItem("iseu_no_appendix") === "true") {
+          document.getElementById("no_appendix").checked = true;
+        }
+        const savedName = localStorage.getItem("iseu_student_name");
+        if (savedName) document.getElementById("student_name").value = savedName;
+        const savedSupervisor = localStorage.getItem("iseu_supervisor");
+        if (savedSupervisor) document.getElementById("supervisor").value = savedSupervisor;
+      } catch (e) {}
     }
 
     function submitForm() {
@@ -300,6 +386,21 @@
       if (department === "Другая кафедра (ввести вручную)") {
         const customDept = document.getElementById("custom_department").value.trim();
         department = customDept || "Кафедра экологического мониторинга";
+      }
+
+      const customRules = document.getElementById("custom_rules").value.trim();
+      const noSubsections = document.getElementById("no_subsections").checked;
+      const noAppendix = document.getElementById("no_appendix").checked;
+
+      // Save preferences if checkbox enabled
+      if (document.getElementById("save_rules_pref").checked) {
+        try {
+          localStorage.setItem("iseu_custom_rules", customRules);
+          localStorage.setItem("iseu_no_subsections", noSubsections);
+          localStorage.setItem("iseu_no_appendix", noAppendix);
+          localStorage.setItem("iseu_student_name", document.getElementById("student_name").value.trim());
+          localStorage.setItem("iseu_supervisor", document.getElementById("supervisor").value.trim());
+        } catch (e) {}
       }
 
       const btn = document.getElementById("submitBtn");
@@ -325,7 +426,11 @@
         include_images: document.getElementById("include_images").checked,
         anti_ai_style: document.getElementById("anti_ai_style").checked,
         generate_speech: document.getElementById("generate_speech").checked,
-        gost_bibliography: document.getElementById("gost_bibliography").checked
+        gost_bibliography: document.getElementById("gost_bibliography").checked,
+        custom_rules: customRules,
+        no_subsections: noSubsections,
+        no_appendix: noAppendix,
+        reference_file: selectedRefFile
       };
 
       if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.sendData) {

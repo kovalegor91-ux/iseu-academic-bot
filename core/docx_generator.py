@@ -48,18 +48,27 @@ class DocxGenerator:
         normal_style.font.size = Pt(14)
         normal_style.font.color.rgb = RGBColor(0, 0, 0)
 
-        # 3. Enable Page Numbering in Footer (centered, skipping first page)
+        # Enable Page Numbering in Footer (centered, skipping first page)
         section.different_first_page_header_footer = True
         footer = section.footer
         footer_p = footer.paragraphs[0]
         footer_p.alignment = WD_ALIGN_PARAGRAPH.CENTER
         cls._add_page_number_field(footer_p)
 
+        # Enable Word automatic field updates (TOC, page numbers) on document open
+        try:
+            settings_el = doc.settings.element
+            upd = OxmlElement('w:updateFields')
+            upd.set(qn('w:val'), 'true')
+            settings_el.append(upd)
+        except Exception as e:
+            logger.debug(f"Could not set updateFields: {e}")
+
         # 4. Build Title Page
         cls._build_title_page(doc, doc_data)
         doc.add_page_break()
 
-        # 5. Build Table of Contents
+        # 5. Build Dynamic Table of Contents
         cls._build_table_of_contents(doc, doc_data)
         doc.add_page_break()
 
@@ -70,8 +79,9 @@ class DocxGenerator:
         # 7. Build Main Sections & Subsections with Figures
         figure_counter = 1
         sections = doc_data.get("sections", [])
+        no_subs = doc_data.get("no_subsections", False)
         for sec_idx, sec in enumerate(sections, 1):
-            cls._build_section(doc, sec, figure_counter, image_map)
+            cls._build_section(doc, sec, figure_counter, image_map, no_subsections=no_subs)
             # Count figures added
             for sub in sec.get("subsections", []):
                 if sub.get("image_needed") and sub.get("image_query") in image_map:
@@ -88,8 +98,8 @@ class DocxGenerator:
         # 9. Build Bibliography (Список использованных источников)
         cls._build_bibliography(doc, doc_data)
 
-        # 10. If Speech Text exists, append as Appendix
-        if doc_data.get("speech_text"):
+        # 10. If Speech Text exists, append as Appendix (unless user requested no_appendix)
+        if doc_data.get("speech_text") and not doc_data.get("no_appendix", False):
             doc.add_page_break()
             cls._build_speech_notes_appendix(doc, doc_data["speech_text"])
 
@@ -110,6 +120,17 @@ class DocxGenerator:
         fldSimple = OxmlElement('w:fldSimple')
         fldSimple.set(qn('w:instr'), 'PAGE')
         run._r.append(fldSimple)
+
+    @classmethod
+    def _set_outline_level(cls, paragraph, level: int = 0):
+        """Assign outline level so Word TOC automatically registers this heading."""
+        try:
+            pPr = paragraph._element.get_or_add_pPr()
+            lvl = OxmlElement('w:outlineLvl')
+            lvl.set(qn('w:val'), str(level))
+            pPr.append(lvl)
+        except Exception as e:
+            logger.debug(f"Could not set outline level: {e}")
 
     @classmethod
     def _format_body_paragraph(cls, p, text: str = ""):
@@ -228,7 +249,7 @@ class DocxGenerator:
 
     @classmethod
     def _build_table_of_contents(cls, doc: docx.Document, data: Dict[str, Any]):
-        """Build formatted Table of Contents."""
+        """Build automatic dynamic Table of Contents with native Word field update."""
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_title.paragraph_format.space_after = Pt(18)
@@ -237,18 +258,34 @@ class DocxGenerator:
         r.font.size = Pt(14)
         r.bold = True
 
+        # Native Microsoft Word Dynamic TOC Field (updates automatically on open or F9/Update Field)
+        p_fld = doc.add_paragraph()
+        p_fld.paragraph_format.space_before = Pt(0)
+        p_fld.paragraph_format.space_after = Pt(8)
+        p_fld.paragraph_format.first_line_indent = Cm(0)
+        r_fld = p_fld.add_run()
+        fldSimple = OxmlElement('w:fldSimple')
+        fldSimple.set(qn('w:instr'), r'TOC \o "1-2" \h \z \u')
+        r_fld._r.append(fldSimple)
+
+        # Pre-rendered clean TOC lines for immediate display across all mobile/web viewers
+        no_subs = data.get("no_subsections", False)
+        no_app = data.get("no_appendix", False)
+
         toc_items = ["ВВЕДЕНИЕ"]
         for sec in data.get("sections", []):
             sec_num = sec.get("number", "")
             sec_title = sec.get("title", "")
             toc_items.append(f"{sec_num} {sec_title}".upper())
-            for sub in sec.get("subsections", []):
-                sub_num = sub.get("number", "")
-                sub_title = sub.get("title", "")
-                toc_items.append(f"  {sub_num} {sub_title}")
+            if not no_subs:
+                for sub in sec.get("subsections", []):
+                    sub_num = sub.get("number", "")
+                    sub_title = sub.get("title", "")
+                    if sub_title:
+                        toc_items.append(f"  {sub_num} {sub_title}")
         toc_items.append("ЗАКЛЮЧЕНИЕ")
         toc_items.append("СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ")
-        if data.get("speech_text"):
+        if data.get("speech_text") and not no_app:
             toc_items.append("ПРИЛОЖЕНИЕ А. Тезисы доклада для защиты")
 
         for item in toc_items:
@@ -268,6 +305,7 @@ class DocxGenerator:
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_title.paragraph_format.space_after = Pt(14)
+        cls._set_outline_level(p_title, 0)
         r = p_title.add_run("ВВЕДЕНИЕ")
         r.font.name = 'Times New Roman'
         r.font.size = Pt(14)
@@ -329,7 +367,8 @@ class DocxGenerator:
         doc: docx.Document,
         sec: Dict[str, Any],
         figure_start_num: int,
-        image_map: Dict[str, Path]
+        image_map: Dict[str, Path],
+        no_subsections: bool = False
     ):
         """Build Main Section (Глава) and Subsections."""
         sec_num = sec.get("number", 1)
@@ -341,26 +380,43 @@ class DocxGenerator:
         p_sec.paragraph_format.space_before = Pt(12)
         p_sec.paragraph_format.space_after = Pt(12)
         p_sec.paragraph_format.line_spacing = 1.5
+        cls._set_outline_level(p_sec, 0)
         r_sec = p_sec.add_run(f"{sec_num} {sec_title}".upper())
         r_sec.font.name = 'Times New Roman'
         r_sec.font.size = Pt(14)
         r_sec.bold = True
 
         current_fig_num = figure_start_num
+        no_subs = no_subsections or sec.get("no_subsections", False)
+
+        # Direct paragraphs on section if no subsections
+        if "paragraphs" in sec and sec["paragraphs"]:
+            for para_idx, text in enumerate(sec["paragraphs"]):
+                p = doc.add_paragraph()
+                cls._format_body_paragraph(p, text)
+                if sec.get("image_needed") and para_idx == 0:
+                    q = sec.get("image_query", "")
+                    img_path = image_map.get(q)
+                    if img_path and img_path.exists():
+                        cls._insert_figure(doc, img_path, current_fig_num, sec.get("image_caption", q))
+                        current_fig_num += 1
+
         for sub in sec.get("subsections", []):
             sub_num = sub.get("number", f"{sec_num}.1")
             sub_title = sub.get("title", "")
 
-            # Subsection Heading 2: 1.1 Название подраздела
-            p_sub = doc.add_paragraph()
-            p_sub.paragraph_format.first_line_indent = Cm(1.25)
-            p_sub.paragraph_format.space_before = Pt(10)
-            p_sub.paragraph_format.space_after = Pt(8)
-            p_sub.paragraph_format.line_spacing = 1.5
-            r_sub = p_sub.add_run(f"{sub_num} {sub_title}")
-            r_sub.font.name = 'Times New Roman'
-            r_sub.font.size = Pt(14)
-            r_sub.bold = True
+            # Subsection Heading 2: 1.1 Название подраздела (only if not no_subs)
+            if not no_subs and sub_title:
+                p_sub = doc.add_paragraph()
+                p_sub.paragraph_format.first_line_indent = Cm(1.25)
+                p_sub.paragraph_format.space_before = Pt(10)
+                p_sub.paragraph_format.space_after = Pt(8)
+                p_sub.paragraph_format.line_spacing = 1.5
+                cls._set_outline_level(p_sub, 1)
+                r_sub = p_sub.add_run(f"{sub_num} {sub_title}")
+                r_sub.font.name = 'Times New Roman'
+                r_sub.font.size = Pt(14)
+                r_sub.bold = True
 
             # Paragraphs
             paragraphs = sub.get("paragraphs", [])
@@ -407,6 +463,7 @@ class DocxGenerator:
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_title.paragraph_format.space_after = Pt(14)
+        cls._set_outline_level(p_title, 0)
         r = p_title.add_run("ЗАКЛЮЧЕНИЕ")
         r.font.name = 'Times New Roman'
         r.font.size = Pt(14)
@@ -427,6 +484,7 @@ class DocxGenerator:
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_title.paragraph_format.space_after = Pt(14)
+        cls._set_outline_level(p_title, 0)
         r = p_title.add_run("СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ")
         r.font.name = 'Times New Roman'
         r.font.size = Pt(14)
@@ -450,6 +508,7 @@ class DocxGenerator:
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
         p_title.paragraph_format.space_after = Pt(14)
+        cls._set_outline_level(p_title, 0)
         r = p_title.add_run("ПРИЛОЖЕНИЕ А\nТезисы доклада для защиты (речь выступления)")
         r.font.name = 'Times New Roman'
         r.font.size = Pt(14)

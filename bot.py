@@ -52,8 +52,8 @@ def get_main_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     """Build persistent bottom menu keyboard."""
     buttons = [
         [KeyboardButton(text="⚙️ Конструктор работы", web_app=WebAppInfo(url=WEBAPP_URL))] if WEBAPP_URL.startswith("https") else [KeyboardButton(text="📝 Создать работу в чате")],
-        [KeyboardButton(text="📋 Стандарты МГЭИ"), KeyboardButton(text="💡 Помощь и образцы")],
-        [KeyboardButton(text="🔄 Сбросить сессию")]
+        [KeyboardButton(text="📋 Стандарты МГЭИ"), KeyboardButton(text="🎯 Мои правила")],
+        [KeyboardButton(text="💡 Помощь и образцы"), KeyboardButton(text="🔄 Сбросить сессию")]
     ]
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
 
@@ -152,6 +152,85 @@ async def cmd_clear(message: types.Message):
     SessionManager.clear_session(user_id)
     await message.answer("🧹 Сессия очищена. Вы можете начать создание новой работы!", reply_markup=get_main_keyboard(user_id))
 
+def format_rules_text(session: UserSession) -> str:
+    sub_status = "❌ Включено (главы сплошным текстом)" if session.no_subsections else "✅ Выключено (разделы 1.1, 1.2 присутствуют)"
+    app_status = "❌ Исключены (без речи и приложений)" if session.no_appendix else "✅ Включены (речь и приложения формируются)"
+    ref_status = f"✅ Загружен ({session.reference_data.get('type', 'файл').upper()})" if session.reference_data else "❌ Не загружен"
+    rules_val = session.custom_rules if session.custom_rules else "Не заданы (стандартные требования МГЭИ)"
+
+    return (
+        "🎯 **Ваши индивидуальные условия и настройки генерации:**\n\n"
+        f"• **Режим без подпунктов:** {sub_status}\n"
+        f"• **Режим без приложений:** {app_status}\n"
+        f"• **Эталонный файл-образец:** {ref_status}\n"
+        f"• **Индивидуальные требования к содержанию:**\n"
+        f"_{rules_val}_\n\n"
+        "💡 *Вы можете переключать параметры кнопками ниже или задать их через «Конструктор работы».*\n"
+        "Чтобы задать требования прямо в чате, напишите:\n`Правила: ваши требования`"
+    )
+
+def get_rules_keyboard(session: UserSession) -> InlineKeyboardMarkup:
+    sub_btn_text = "Включить 1.1, 1.2" if session.no_subsections else "Убрать подпункты (сплошной текст)"
+    app_btn_text = "Включить приложения" if session.no_appendix else "Убрать приложения"
+    buttons = [
+        [
+            InlineKeyboardButton(text=f"🔄 {sub_btn_text}", callback_data="toggle_subsections"),
+            InlineKeyboardButton(text=f"🔄 {app_btn_text}", callback_data="toggle_appendix")
+        ],
+        [
+            InlineKeyboardButton(text="🗑️ Сбросить образец", callback_data="clear_reference"),
+            InlineKeyboardButton(text="🧹 Очистить требования", callback_data="clear_custom_rules")
+        ]
+    ]
+    if WEBAPP_URL.startswith("https"):
+        buttons.append([InlineKeyboardButton(text="⚙️ Открыть Конструктор WebApp", web_app=WebAppInfo(url=WEBAPP_URL))])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+@dp.message(Command("rules"))
+@dp.message(F.text == "🎯 Мои правила")
+async def cmd_rules(message: types.Message):
+    user_id = message.from_user.id
+    session = SessionManager.get_session(user_id)
+    text = format_rules_text(session)
+    await message.answer(text, parse_mode=ParseMode.MARKDOWN, reply_markup=get_rules_keyboard(session))
+
+@dp.callback_query(F.data == "toggle_subsections")
+async def cb_toggle_subsections(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    session = SessionManager.get_session(user_id)
+    session.no_subsections = not session.no_subsections
+    SessionManager.save_session(user_id)
+    await call.answer("Настройка 'без подпунктов' обновлена")
+    await call.message.edit_text(format_rules_text(session), parse_mode=ParseMode.MARKDOWN, reply_markup=get_rules_keyboard(session))
+
+@dp.callback_query(F.data == "toggle_appendix")
+async def cb_toggle_appendix(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    session = SessionManager.get_session(user_id)
+    session.no_appendix = not session.no_appendix
+    SessionManager.save_session(user_id)
+    await call.answer("Настройка 'без приложений' обновлена")
+    await call.message.edit_text(format_rules_text(session), parse_mode=ParseMode.MARKDOWN, reply_markup=get_rules_keyboard(session))
+
+@dp.callback_query(F.data == "clear_reference")
+async def cb_clear_reference(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    session = SessionManager.get_session(user_id)
+    session.reference_data = None
+    SessionManager.save_session(user_id)
+    await call.answer("Образец сброшен")
+    await call.message.edit_text(format_rules_text(session), parse_mode=ParseMode.MARKDOWN, reply_markup=get_rules_keyboard(session))
+
+@dp.callback_query(F.data == "clear_custom_rules")
+async def cb_clear_custom_rules(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    session = SessionManager.get_session(user_id)
+    session.custom_rules = ""
+    SessionManager.save_session(user_id)
+    await call.answer("Требования очищены")
+    await call.message.edit_text(format_rules_text(session), parse_mode=ParseMode.MARKDOWN, reply_markup=get_rules_keyboard(session))
+
+
 @dp.message(F.document)
 async def handle_document(message: types.Message, bot: Bot):
     """Handle uploaded reference document (.docx or .pptx) for style cloning."""
@@ -201,6 +280,37 @@ async def handle_webapp_data(message: types.Message, bot: Bot):
     raw_json = message.web_app_data.data
     try:
         data = json.loads(raw_json)
+        user_id = message.from_user.id
+        session = SessionManager.get_session(user_id)
+
+        # Update persistent custom rules
+        if "custom_rules" in data:
+            session.custom_rules = data["custom_rules"]
+        if "no_subsections" in data:
+            session.no_subsections = bool(data["no_subsections"])
+        if "no_appendix" in data:
+            session.no_appendix = bool(data["no_appendix"])
+
+        # Update saved student / supervisor params
+        for field in ["faculty", "department", "student_name", "student_course", "student_group", "supervisor"]:
+            if field in data and data[field]:
+                session.params[field] = data[field]
+
+        # Handle uploaded reference file from WebApp if present
+        ref_file = data.get("reference_file")
+        if ref_file and isinstance(ref_file, dict) and ref_file.get("base64"):
+            import base64
+            fname = ref_file.get("filename", "reference.docx")
+            temp_dir = OUTPUT_DIR / "uploads"
+            temp_dir.mkdir(parents=True, exist_ok=True)
+            local_path = temp_dir / f"ref_webapp_{user_id}_{fname}"
+            file_bytes = base64.b64decode(ref_file["base64"])
+            with open(local_path, "wb") as f:
+                f.write(file_bytes)
+            ref_data = ReferenceParser.parse_file(local_path)
+            session.reference_data = ref_data
+
+        SessionManager.save_session(user_id)
         await process_generation_request(message, bot, data)
     except Exception as e:
         logger.error(f"Error handling WebApp data: {e}", exc_info=True)
@@ -214,19 +324,34 @@ async def cmd_new_chat(message: types.Message):
         "Примеры:\n"
         "• `Реферат: Методы оценки радиационной обстановки в Беларуси`\n"
         "• `Презентация: Ветроэнергетический потенциал Минской области`\n"
-        "• `Доклад: Современные подходы к утилизации медицинских отходов`"
+        "• `Доклад: Современные подходы к утилизации медицинских отходов`\n\n"
+        "💡 Для настройки требований отправьте: `Правила: ваши требования`"
     )
 
 @dp.message(F.text)
 async def handle_text_message(message: types.Message, bot: Bot):
     """
     Handle plain text:
-    1. If user has an active work, treat text as an iterative revision/edit request!
-    2. Otherwise, treat text as a topic for a new paper/presentation.
+    1. If user inputs custom rules (starts with "Правила:" or "Требования:"), save them.
+    2. If user has an active work, treat text as an iterative revision/edit request!
+    3. Otherwise, treat text as a topic for a new paper/presentation.
     """
     user_id = message.from_user.id
     session = SessionManager.get_session(user_id)
     text = message.text.strip()
+
+    # Check if user is configuring custom rules via text
+    if text.lower().startswith("правила:") or text.lower().startswith("требования:"):
+        rules_str = text.split(":", 1)[1].strip()
+        session.custom_rules = rules_str
+        SessionManager.save_session(user_id)
+        await message.answer(
+            f"✅ **Ваши индивидуальные требования сохранены:**\n_{rules_str}_\n\n"
+            f"Они будут автоматически применяться ко всем новым рефератам, докладам и презентациям!",
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=get_rules_keyboard(session)
+        )
+        return
 
     # Check if active work exists and user is asking for revision
     has_active_work = bool(session.current_doc_data or session.current_pres_data)
@@ -262,7 +387,10 @@ async def handle_text_message(message: types.Message, bot: Bot):
             "slide_count": 8,
             "include_images": True,
             "anti_ai_style": True,
-            "generate_speech": True
+            "generate_speech": True,
+            "custom_rules": session.custom_rules,
+            "no_subsections": session.no_subsections,
+            "no_appendix": session.no_appendix
         }
         await process_generation_request(message, bot, data)
 
@@ -313,6 +441,9 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
     topic = params.get("topic", "Экологические исследования")
     work_type = params.get("work_type", "doc")
     include_images = params.get("include_images", True)
+    custom_rules = params.get("custom_rules", session.custom_rules)
+    no_subsections = params.get("no_subsections", session.no_subsections)
+    no_appendix = params.get("no_appendix", session.no_appendix)
 
     status_msg = await message.answer(
         f"⏳ **Генерация работы по стандартам МГЭИ им. А.Д. Сахарова:**\n\n"
@@ -338,20 +469,25 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
                 topic=topic,
                 discipline=params.get("discipline", "Экологический мониторинг"),
                 work_type="РЕФЕРАТ" if work_type != "speech" else "ДОКЛАД",
-                faculty=params.get("faculty", "Факультет мониторинга окружающей среды"),
-                department=params.get("department", "Кафедра экологического мониторинга"),
-                student_name=params.get("student_name", "Иванов И.И."),
-                student_course=str(params.get("student_course", "3")),
-                student_group=params.get("student_group", "301"),
-                supervisor=params.get("supervisor", "доцент, к.б.н. Петров П.П."),
+                faculty=params.get("faculty", session.params.get("faculty", "Факультет мониторинга окружающей среды")),
+                department=params.get("department", session.params.get("department", "Кафедра экологического мониторинга")),
+                student_name=params.get("student_name", session.params.get("student_name", "Иванов И.И.")),
+                student_course=str(params.get("student_course", session.params.get("student_course", "3"))),
+                student_group=params.get("student_group", session.params.get("student_group", "301")),
+                supervisor=params.get("supervisor", session.params.get("supervisor", "доцент, к.б.н. Петров П.П.")),
                 page_count=params.get("page_count", 15),
                 include_images=include_images,
-                reference_data=session.reference_data
+                reference_data=session.reference_data,
+                custom_rules=custom_rules,
+                no_subsections=no_subsections,
+                no_appendix=no_appendix
             )
             doc_data = await gemini.generate_json(
                 prompt=prompt,
                 system_instruction=ACADEMIC_HUMAN_SYSTEM_INSTRUCTION
             )
+            doc_data["no_subsections"] = no_subsections
+            doc_data["no_appendix"] = no_appendix
             session.current_doc_data = doc_data
 
         # 2. Generate PPTX data if requested
@@ -359,13 +495,14 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
             pres_prompt = build_presentation_prompt(
                 topic=topic,
                 discipline=params.get("discipline", "Экологический мониторинг"),
-                faculty=params.get("faculty", "Факультет мониторинга окружающей среды"),
-                student_name=params.get("student_name", "Иванов И.И."),
-                supervisor=params.get("supervisor", "доцент, к.б.н. Петров П.П."),
+                faculty=params.get("faculty", session.params.get("faculty", "Факультет мониторинга окружающей среды")),
+                student_name=params.get("student_name", session.params.get("student_name", "Иванов И.И.")),
+                supervisor=params.get("supervisor", session.params.get("supervisor", "доцент, к.б.н. Петров П.П.")),
                 slide_count=params.get("slide_count", 8),
                 include_images=include_images,
                 doc_context=doc_data,
-                reference_data=session.reference_data
+                reference_data=session.reference_data,
+                custom_rules=custom_rules
             )
             pres_data = await gemini.generate_json(
                 prompt=pres_prompt,
