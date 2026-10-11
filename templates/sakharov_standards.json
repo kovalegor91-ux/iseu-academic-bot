@@ -1,0 +1,63 @@
+{
+  "university": {
+    "ministry": "МИНИСТЕРСТВО ОБРАЗОВАНИЯ РЕСПУБЛИКИ БЕЛАРУСЬ",
+    "university_name": "БЕЛОРУССКИЙ ГОСУДАРСТВЕННЫЙ УНИВЕРСИТЕТ",
+    "institute_name": "МЕЖДУНАРОДНЫЙ ГОСУДАРСТВЕННЫЙ ЭКОЛОГИЧЕСКИЙ ИНСТИТУТ ИМЕНИ А. Д. САХАРОВА",
+    "city": "Минск"
+  },
+  "faculties": [
+    {
+      "id": "fmos",
+      "name": "Факультет мониторинга окружающей среды",
+      "short_name": "ФМОС",
+      "departments": [
+        "Кафедра экологического мониторинга",
+        "Кафедра общей экологии",
+        "Кафедра экологических информационных систем",
+        "Кафедра энергоэффективных технологий",
+        "Кафедра физики и высшей математики"
+      ]
+    },
+    {
+      "id": "fem",
+      "name": "Факультет экологической медицины",
+      "short_name": "ФЭМ",
+      "departments": [
+        "Кафедра экологической медицины и радиобиологии",
+        "Кафедра иммунологии",
+        "Кафедра биохимии и биофизики",
+        "Кафедра экологической и молекулярной генетики",
+        "Кафедра социально-гуманитарных наук и устойчивого развития"
+      ]
+    }
+  ],
+  "formatting": {
+    "font_name": "Times New Roman",
+    "font_size_pt": 14,
+    "line_spacing": 1.5,
+    "first_line_indent_cm": 1.25,
+    "margins_mm": {
+      "top": 20,
+      "bottom": 20,
+      "left": 30,
+      "right": 10
+    },
+    "table_font_size_pt": 12,
+    "caption_font_size_pt": 12,
+    "page_numbering": {
+      "position": "bottom_center",
+      "skip_title_page": true
+    }
+  },
+  "presentation": {
+    "aspect_ratio": "16:9",
+    "primary_color": "#123B2F",
+    "secondary_color": "#2E7D32",
+    "accent_color": "#27AE60",
+    "bg_color": "#FFFFFF",
+    "card_bg_color": "#F4F7F5",
+    "text_color": "#1A2521",
+    "heading_font": "Arial",
+    "body_font": "Calibri"
+  }
+}

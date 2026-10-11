@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Конструктор работ МГЭИ им. А.Д. Сахарова</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>МГЭИ им. А.Д. Сахарова БГУ</h1>
+      <p>Генератор рефератов, докладов и презентаций по ГОСТ</p>
+    </div>
+
+    <!-- Тип работы -->
+    <div class="card">
+      <div class="section-title">
+        <span>📄</span> Выберите тип работы
+      </div>
+      <div class="work-types">
+        <div class="work-type-btn active" data-type="doc" onclick="selectType('doc', this)">
+          📄 Реферат (DOCX)
+        </div>
+        <div class="work-type-btn" data-type="speech" onclick="selectType('speech', this)">
+          🎤 Доклад с речью
+        </div>
+        <div class="work-type-btn" data-type="pres" onclick="selectType('pres', this)">
+          📊 Презентация (PPTX)
+        </div>
+        <div class="work-type-btn" data-type="bundle" onclick="selectType('bundle', this)">
+          🚀 Комплект (Всё)
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="topic">Тема работы *</label>
+        <textarea id="topic" rows="2" placeholder="Например: Методы биологической очистки сточных вод урбанизированных территорий" required></textarea>
+      </div>
+
+      <div class="form-group">
+        <label for="discipline">Дисциплина *</label>
+        <input type="text" id="discipline" placeholder="Например: Экологический мониторинг" value="Экологический мониторинг">
+      </div>
+    </div>
+
+    <!-- Университет и кафедра -->
+    <div class="card">
+      <div class="section-title">
+        <span>🏛️</span> Кафедра и факультет МГЭИ
+      </div>
+      <div class="form-group">
+        <label for="faculty">Факультет</label>
+        <select id="faculty" onchange="updateDepartments()">
+          <option value="Факультет мониторинга окружающей среды">Факультет мониторинга окружающей среды (ФМОС)</option>
+          <option value="Факультет экологической медицины">Факультет экологической медицины (ФЭМ)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label for="department">Кафедра</label>
+        <select id="department">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+    </div>
+
+    <!-- Автор и руководитель -->
+    <div class="card">
+      <div class="section-title">
+        <span>👤</span> Данные для титульного листа
+      </div>
+      <div class="grid-3 form-group">
+        <div>
+          <label for="student_name">ФИО студента</label>
+          <input type="text" id="student_name" placeholder="Иванов И.И." value="Иванов И.И.">
+        </div>
+        <div>
+          <label for="student_course">Курс</label>
+          <input type="number" id="student_course" value="3" min="1" max="5">
+        </div>
+        <div>
+          <label for="student_group">Группа</label>
+          <input type="text" id="student_group" value="301">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="supervisor">Научный руководитель (должность, степень, ФИО)</label>
+        <input type="text" id="supervisor" placeholder="доцент, к.б.н. Петров П.П." value="доцент, к.б.н. Петров П.П.">
+      </div>
+    </div>
+
+    <!-- Настройки качества и объема -->
+    <div class="card">
+      <div class="section-title">
+        <span>⚙️</span> Параметры генерации
+      </div>
+
+      <div class="grid-2 form-group" id="volumeGroup">
+        <div>
+          <label for="page_count">Страниц DOCX</label>
+          <input type="number" id="page_count" value="15" min="5" max="35">
+        </div>
+        <div>
+          <label for="slide_count">Слайдов PPTX</label>
+          <input type="number" id="slide_count" value="8" min="4" max="20">
+        </div>
+      </div>
+
+      <div class="toggle-group">
+        <div class="toggle-info">
+          <div class="toggle-title">🖼️ Иллюстрации и схемы <span class="badge">ГОСТ</span></div>
+          <div class="toggle-desc">Поиск научных схем в сети + AI генерация с подписями по ГОСТ</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="include_images" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="toggle-group">
+        <div class="toggle-info">
+          <div class="toggle-title">🛡️ Человеческий язык <span class="badge">Анти-AI</span></div>
+          <div class="toggle-desc">Защита от детекторов ИИ: естественный стиль студента Сахарова</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="anti_ai_style" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="toggle-group">
+        <div class="toggle-info">
+          <div class="toggle-title">🎤 Речь для защиты</div>
+          <div class="toggle-desc">Готовый текст доклада студента и заметки к каждому слайду</div>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="generate_speech" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <button type="button" class="submit-btn" onclick="submitForm()">
+      <span>✨</span> Сгенерировать работу
+    </button>
+  </div>
+
+  <script>
+    const departmentsByFaculty = {
+      "Факультет мониторинга окружающей среды": [
+        "Кафедра экологического мониторинга",
+        "Кафедра общей экологии",
+        "Кафедра экологических информационных систем",
+        "Кафедра энергоэффективных технологий",
+        "Кафедра физики и высшей математики"
+      ],
+      "Факультет экологической медицины": [
+        "Кафедра экологической медицины и радиобиологии",
+        "Кафедра иммунологии",
+        "Кафедра биохимии и биофизики",
+        "Кафедра экологической и молекулярной генетики",
+        "Кафедра социально-гуманитарных наук и устойчивого развития"
+      ]
+    };
+
+    let selectedType = "doc";
+
+    function updateDepartments() {
+      const fac = document.getElementById("faculty").value;
+      const deptSelect = document.getElementById("department");
+      deptSelect.innerHTML = "";
+      const depts = departmentsByFaculty[fac] || [];
+      depts.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d;
+        opt.textContent = d;
+        deptSelect.appendChild(opt);
+      });
+    }
+
+    function selectType(type, element) {
+      selectedType = type;
+      document.querySelectorAll(".work-type-btn").forEach(btn => btn.classList.remove("active"));
+      element.classList.add("active");
+    }
+
+    function initTelegram() {
+      if (window.Telegram && window.Telegram.WebApp) {
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        tg.ready();
+      }
+    }
+
+    function submitForm() {
+      const topic = document.getElementById("topic").value.trim();
+      if (!topic) {
+        alert("Пожалуйста, введите тему работы!");
+        document.getElementById("topic").focus();
+        return;
+      }
+
+      const payload = {
+        action: "generate",
+        work_type: selectedType,
+        topic: topic,
+        discipline: document.getElementById("discipline").value.trim(),
+        faculty: document.getElementById("faculty").value,
+        department: document.getElementById("department").value,
+        student_name: document.getElementById("student_name").value.trim(),
+        student_course: document.getElementById("student_course").value,
+        student_group: document.getElementById("student_group").value.trim(),
+        supervisor: document.getElementById("supervisor").value.trim(),
+        page_count: parseInt(document.getElementById("page_count").value) || 15,
+        slide_count: parseInt(document.getElementById("slide_count").value) || 8,
+        include_images: document.getElementById("include_images").checked,
+        anti_ai_style: document.getElementById("anti_ai_style").checked,
+        generate_speech: document.getElementById("generate_speech").checked
+      };
+
+      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.sendData) {
+        window.Telegram.WebApp.sendData(JSON.stringify(payload));
+      } else {
+        alert("Данные для генерации сформированы:\n\n" + JSON.stringify(payload, null, 2));
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      updateDepartments();
+      initTelegram();
+    });
+  </script>
+</body>
+</html>
