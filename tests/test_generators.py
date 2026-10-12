@@ -193,6 +193,31 @@ async def test_full_pipeline():
     assert pptx_ref["type"] == "pptx"
     assert pptx_ref["slide_count"] == 4
 
+    print("\n--- 5. Testing GeminiClient JSON Repair (Truncation, Inner Quotes, Missing Commas) ---")
+    from core.gemini_client import GeminiClient
+    gc = GeminiClient()
+
+    # Case 1: Truncated mid-string
+    t1 = '{"sections": [{"title": "Глава 1", "subsections": [{"title": "1.1", "paragraphs": ["Текст оборвался'
+    res1 = gc._parse_json(t1)
+    assert res1["sections"][0]["title"] == "Глава 1"
+
+    # Case 2: Truncated right after inner closing brace '}' (the exact char 23525 bug!)
+    t2 = '{"sections": [{"title": "Глава 1", "subsections": [{"title": "1.1"}'
+    res2 = gc._parse_json(t2)
+    assert res2["sections"][0]["subsections"][0]["title"] == "1.1"
+
+    # Case 3: Unescaped inner straight quotes inside Russian text
+    t3 = '{\n  "title": "Закон "Об охране среды" РБ",\n  "year": "2026"\n}'
+    res3 = gc._parse_json(t3)
+    assert "Об охране среды" in res3["title"]
+
+    # Case 4: Missing comma between lines + trailing comma
+    t4 = '{\n  "a": "1"\n  "b": "2",\n}'
+    res4 = gc._parse_json(t4)
+    assert res4["a"] == "1" and res4["b"] == "2"
+    print("✅ All 4 malformed/truncated JSON cases repaired and parsed cleanly!")
+
     print("\n🎉 ALL TESTS PASSED SUCCESSFULLY! BOTH GENERATORS AND PARSERS WORK FLAWLESSLY!")
 
 if __name__ == "__main__":
