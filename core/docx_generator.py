@@ -236,10 +236,15 @@ class DocxGenerator:
 
         # Author and Supervisor Block (Right-aligned table or tabbed)
         student = data.get("student", {})
-        st_name = student.get("name", "Иванов И.И.")
-        st_course = student.get("course", "3")
-        st_group = student.get("group", "301")
+        st_name = student.get("name", data.get("student_name", "Иванов И.И."))
+        st_course = student.get("course", data.get("student_course", "3"))
+        st_group = student.get("group", data.get("student_group", "301"))
+        st_subgroup = str(student.get("subgroup", data.get("student_subgroup", ""))).strip()
         supervisor = data.get("supervisor", "доцент, к.б.н. Петров П.П.")
+
+        group_line = f"студент(ка) {st_course} курса группы {st_group}"
+        if st_subgroup and st_subgroup not in st_group:
+            group_line += f" (подгруппа {st_subgroup})"
 
         table = doc.add_table(rows=1, cols=2)
         table.alignment = WD_TABLE_ALIGNMENT.CENTER
@@ -250,7 +255,7 @@ class DocxGenerator:
         cell_right = table.cell(0, 1)
         lines_info = [
             ("Выполнил(а):", True),
-            (f"студент(ка) {st_course} курса группы {st_group}", False),
+            (group_line, False),
             (f"{st_name}", True),
             ("", False),
             ("Проверил(а):", True),

@@ -140,6 +140,37 @@ class KnowledgeBase:
         return []
 
     @classmethod
+    def delete_user_document(cls, user_id: int, filename: str) -> Dict[str, Any]:
+        """Remove a document from the user's personal knowledge base."""
+        user_dir = USERS_KB_DIR / str(user_id)
+        target_file = user_dir / filename
+        if target_file.exists():
+            try:
+                target_file.unlink()
+            except Exception as e:
+                logger.warning(f"Could not delete file {target_file}: {e}")
+
+        profile_file = PROFILES_DIR / f"profile_{user_id}.json"
+        if profile_file.exists():
+            try:
+                with open(profile_file, "r", encoding="utf-8") as f:
+                    profile = json.load(f)
+                profile["documents"] = [
+                    d for d in profile.get("documents", []) if d.get("filename") != filename
+                ]
+                profile["total_docs"] = len(profile["documents"])
+                with open(profile_file, "w", encoding="utf-8") as f:
+                    json.dump(profile, f, ensure_ascii=False, indent=2)
+            except Exception as e:
+                logger.warning(f"Could not update profile after deleting {filename}: {e}")
+
+        return {
+            "documents": cls.get_user_documents(user_id),
+            "stats": cls.get_stats(user_id)
+        }
+
+
+    @classmethod
     def get_learning_context(cls, user_id: int, mode: str = "my_docs") -> str:
         """
         Build instruction prompt context based on selected learning mode:

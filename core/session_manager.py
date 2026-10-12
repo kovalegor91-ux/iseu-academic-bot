@@ -23,12 +23,28 @@ class UserSession:
         self.params: Dict[str, Any] = {
             "faculty": "Факультет мониторинга окружающей среды",
             "department": "Кафедра экологического мониторинга",
+            "custom_department": "",
+            "discipline": "Экологический мониторинг",
             "student_name": "Иванов И.И.",
+            "education_form": "дневной",
             "student_course": "3",
             "student_group": "301",
+            "student_subgroup": "",
             "supervisor": "доцент, к.б.н. Петров П.П.",
+            "page_count": 15,
+            "slide_count": 8,
             "include_images": True,
-            "anti_ai_style": True
+            "anti_ai_style": True,
+            "learning_mode": "my_docs",
+            "sections_config": {
+                "title_page": True,
+                "toc": True,
+                "intro": True,
+                "body": True,
+                "conclusion": True,
+                "bibliography": True,
+                "appendix": True
+            }
         }
 
     def to_dict(self) -> Dict[str, Any]:
@@ -62,7 +78,9 @@ class UserSession:
         sess.custom_rules = data.get("custom_rules", "")
         sess.no_subsections = data.get("no_subsections", False)
         sess.no_appendix = data.get("no_appendix", False)
-        sess.params = data.get("params", sess.params)
+        saved_params = data.get("params", {})
+        if isinstance(saved_params, dict):
+            sess.params.update(saved_params)
         return sess
 
 class SessionManager:

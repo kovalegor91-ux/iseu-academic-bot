@@ -18,6 +18,8 @@ EXCLUDE_PATTERNS = [
     "output/Test_",
     "output/images/img_",
     "output/test_images",
+    "output/knowledge_base",
+    "output/uploads",
     "sessions/session_",
     ".git"
 ]

@@ -49,10 +49,15 @@ logger = logging.getLogger(__name__)
 dp = Dispatcher()
 gemini = GeminiClient()
 
+def get_user_webapp_url(user_id: int) -> str:
+    """Append user_id and version to WebApp URL for reliable state persistence and cache busting."""
+    sep = "&" if "?" in WEBAPP_URL else "?"
+    return f"{WEBAPP_URL}{sep}uid={user_id}&v=4"
+
 def get_main_keyboard(user_id: int) -> ReplyKeyboardMarkup:
     """Build persistent bottom menu keyboard."""
     buttons = [
-        [KeyboardButton(text="⚙️ Конструктор работы", web_app=WebAppInfo(url=WEBAPP_URL))] if WEBAPP_URL.startswith("https") else [KeyboardButton(text="📝 Создать работу в чате")],
+        [KeyboardButton(text="⚙️ Конструктор работы", web_app=WebAppInfo(url=get_user_webapp_url(user_id)))] if WEBAPP_URL.startswith("https") else [KeyboardButton(text="📝 Создать работу в чате")],
         [KeyboardButton(text="📋 Стандарты МГЭИ"), KeyboardButton(text="🎯 Мои правила")],
         [KeyboardButton(text="💡 Помощь и образцы"), KeyboardButton(text="🔄 Сбросить сессию")]
     ]
@@ -185,7 +190,7 @@ def get_rules_keyboard(session: UserSession) -> InlineKeyboardMarkup:
         ]
     ]
     if WEBAPP_URL.startswith("https"):
-        buttons.append([InlineKeyboardButton(text="⚙️ Открыть Конструктор WebApp", web_app=WebAppInfo(url=WEBAPP_URL))])
+        buttons.append([InlineKeyboardButton(text="⚙️ Открыть Конструктор WebApp", web_app=WebAppInfo(url=get_user_webapp_url(session.user_id)))])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 @dp.message(Command("rules"))
@@ -291,22 +296,24 @@ async def handle_webapp_data(message: types.Message, bot: Bot):
     try:
         data = json.loads(raw_json)
         user_id = message.from_user.id
-        session = SessionManager.get_session(user_id)
+        session = webapp_server._update_session_from_payload(user_id, data)
 
-        # Update persistent custom rules
-        if "custom_rules" in data:
-            session.custom_rules = data["custom_rules"]
-        if "no_subsections" in data:
-            session.no_subsections = bool(data["no_subsections"])
-        if "no_appendix" in data:
-            session.no_appendix = bool(data["no_appendix"])
+        # Claim any staged files uploaded via /api/upload_reference before sendData
+        staged_files = data.get("staged_files", [])
+        for sf_name in staged_files:
+            safe_name = os.path.basename(sf_name)
+            staged_path = webapp_server.STAGED_UPLOADS_DIR / safe_name
+            if staged_path.exists():
+                try:
+                    with open(staged_path, "rb") as f:
+                        fbytes = f.read()
+                    res = KnowledgeBase.add_document(user_id, safe_name, fbytes)
+                    session.reference_data = res["parsed"]
+                    staged_path.unlink()
+                except Exception as ex:
+                    logger.warning(f"Failed to claim staged file {safe_name}: {ex}")
 
-        # Update saved student / supervisor params
-        for field in ["faculty", "department", "student_name", "student_course", "student_group", "supervisor"]:
-            if field in data and data[field]:
-                session.params[field] = data[field]
-
-        # Handle multiple uploaded reference files from WebApp if present
+        # Handle inline base64 reference files if any small ones were passed
         ref_files = data.get("reference_files", [])
         if not ref_files and data.get("reference_file"):
             ref_files = [data["reference_file"]]
@@ -320,6 +327,7 @@ async def handle_webapp_data(message: types.Message, bot: Bot):
                 session.reference_data = res["parsed"]
 
         SessionManager.save_session(user_id)
+        data["user_id"] = user_id
         await process_generation_request(message, bot, data)
     except Exception as e:
         logger.error(f"Error handling WebApp data: {e}", exc_info=True)
@@ -383,23 +391,28 @@ async def handle_text_message(message: types.Message, bot: Bot):
             mode = "pres"
 
         data = {
+            "user_id": user_id,
             "work_type": mode,
             "topic": clean_topic,
-            "discipline": "Экологический мониторинг",
+            "discipline": session.params.get("discipline", "Экологический мониторинг"),
             "faculty": session.params.get("faculty", "Факультет мониторинга окружающей среды"),
             "department": session.params.get("department", "Кафедра экологического мониторинга"),
             "student_name": session.params.get("student_name", "Иванов И.И."),
+            "education_form": session.params.get("education_form", "дневной"),
             "student_course": session.params.get("student_course", "3"),
             "student_group": session.params.get("student_group", "301"),
+            "student_subgroup": session.params.get("student_subgroup", ""),
             "supervisor": session.params.get("supervisor", "доцент, к.б.н. Петров П.П."),
-            "page_count": 15,
-            "slide_count": 8,
-            "include_images": True,
+            "page_count": session.params.get("page_count", 15),
+            "slide_count": session.params.get("slide_count", 8),
+            "include_images": session.params.get("include_images", True),
             "anti_ai_style": True,
             "generate_speech": True,
             "custom_rules": session.custom_rules,
             "no_subsections": session.no_subsections,
-            "no_appendix": session.no_appendix
+            "no_appendix": session.no_appendix,
+            "learning_mode": session.params.get("learning_mode", "my_docs"),
+            "sections_config": session.params.get("sections_config", {})
         }
         await process_generation_request(message, bot, data)
 
@@ -442,32 +455,45 @@ async def progress_reporter(bot: Bot, chat_id: int, message_id: int, stop_event:
         except asyncio.TimeoutError:
             pass
 
-async def process_generation_request(message: types.Message, bot: Bot, params: Dict[str, Any]):
-    """Execute end-to-end generation of DOCX and/or PPTX with live visual progress."""
-    user_id = message.from_user.id
+async def process_generation_by_user(user_id: int, chat_id: int, bot: Bot, params: Dict[str, Any]):
+    """Execute end-to-end generation of DOCX and/or PPTX for a given user_id and chat_id."""
     session = SessionManager.get_session(user_id)
 
     topic = params.get("topic", "Экологические исследования")
     work_type = params.get("work_type", "doc")
-    include_images = params.get("include_images", True)
+    include_images = params.get("include_images", session.params.get("include_images", True))
     custom_rules = params.get("custom_rules", session.custom_rules)
     no_subsections = params.get("no_subsections", session.no_subsections)
     no_appendix = params.get("no_appendix", session.no_appendix)
-    learning_mode = params.get("learning_mode", "my_docs")
-    sections_config = params.get("sections_config", {})
+    learning_mode = params.get("learning_mode", session.params.get("learning_mode", "my_docs"))
+    sections_config = params.get("sections_config", session.params.get("sections_config", {}))
     knowledge_context = KnowledgeBase.get_learning_context(user_id, mode=learning_mode)
 
-    status_msg = await message.answer(
-        f"⏳ **Генерация работы по стандартам МГЭИ им. А.Д. Сахарова:**\n\n"
-        f"📌 **Тема:** «{topic[:80]}»\n\n"
-        f"[▰▱▱▱▱▱▱▱▱▱] **10%**\n"
-        f"⚙️ Запускаю академическую генерацию...",
+    faculty = params.get("faculty") or session.params.get("faculty", "Факультет мониторинга окружающей среды")
+    department = params.get("department") or session.params.get("department", "Кафедра экологического мониторинга")
+    discipline = params.get("discipline") or session.params.get("discipline", "Экологический мониторинг")
+    st_name = params.get("student_name") or session.params.get("student_name", "Иванов И.И.")
+    st_course = str(params.get("student_course") or session.params.get("student_course", "3"))
+    st_group = params.get("student_group") or session.params.get("student_group", "301")
+    st_subgroup = str(params.get("student_subgroup", session.params.get("student_subgroup", ""))).strip()
+    supervisor = params.get("supervisor") or session.params.get("supervisor", "доцент, к.б.н. Петров П.П.")
+
+    group_full = f"{st_group} (подгруппа {st_subgroup})" if (st_subgroup and st_subgroup not in st_group) else st_group
+
+    status_msg = await bot.send_message(
+        chat_id=chat_id,
+        text=(
+            f"⏳ **Генерация работы по стандартам МГЭИ им. А.Д. Сахарова:**\n\n"
+            f"📌 **Тема:** «{topic[:80]}»\n\n"
+            f"[▰▱▱▱▱▱▱▱▱▱] **10%**\n"
+            f"⚙️ Запускаю академическую генерацию..."
+        ),
         parse_mode=ParseMode.MARKDOWN
     )
 
     stop_event = asyncio.Event()
     progress_task = asyncio.create_task(
-        progress_reporter(bot, message.chat.id, status_msg.message_id, stop_event, topic)
+        progress_reporter(bot, chat_id, status_msg.message_id, stop_event, topic)
     )
 
     try:
@@ -479,15 +505,15 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
         if work_type in ["doc", "speech", "bundle"]:
             prompt = build_doc_generation_prompt(
                 topic=topic,
-                discipline=params.get("discipline", "Экологический мониторинг"),
+                discipline=discipline,
                 work_type="РЕФЕРАТ" if work_type != "speech" else "ДОКЛАД",
-                faculty=params.get("faculty", session.params.get("faculty", "Факультет мониторинга окружающей среды")),
-                department=params.get("department", session.params.get("department", "Кафедра экологического мониторинга")),
-                student_name=params.get("student_name", session.params.get("student_name", "Иванов И.И.")),
-                student_course=str(params.get("student_course", session.params.get("student_course", "3"))),
-                student_group=params.get("student_group", session.params.get("student_group", "301")),
-                supervisor=params.get("supervisor", session.params.get("supervisor", "доцент, к.б.н. Петров П.П.")),
-                page_count=params.get("page_count", 15),
+                faculty=faculty,
+                department=department,
+                student_name=st_name,
+                student_course=st_course,
+                student_group=group_full,
+                supervisor=supervisor,
+                page_count=params.get("page_count", session.params.get("page_count", 15)),
                 include_images=include_images,
                 reference_data=session.reference_data,
                 custom_rules=custom_rules,
@@ -499,6 +525,17 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
                 prompt=prompt,
                 system_instruction=ACADEMIC_HUMAN_SYSTEM_INSTRUCTION
             )
+            # Explicitly enforce student and title page fields so AI never overwrites them
+            doc_data["faculty"] = faculty
+            doc_data["department"] = department
+            doc_data["discipline"] = discipline
+            doc_data["supervisor"] = supervisor
+            if not isinstance(doc_data.get("student"), dict):
+                doc_data["student"] = {}
+            doc_data["student"]["name"] = st_name
+            doc_data["student"]["course"] = st_course
+            doc_data["student"]["group"] = st_group
+            doc_data["student"]["subgroup"] = st_subgroup
             doc_data["no_subsections"] = no_subsections
             doc_data["no_appendix"] = no_appendix
             doc_data["sections_config"] = sections_config
@@ -508,11 +545,11 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
         if work_type in ["pres", "bundle"]:
             pres_prompt = build_presentation_prompt(
                 topic=topic,
-                discipline=params.get("discipline", "Экологический мониторинг"),
-                faculty=params.get("faculty", session.params.get("faculty", "Факультет мониторинга окружающей среды")),
-                student_name=params.get("student_name", session.params.get("student_name", "Иванов И.И.")),
-                supervisor=params.get("supervisor", session.params.get("supervisor", "доцент, к.б.н. Петров П.П.")),
-                slide_count=params.get("slide_count", 8),
+                discipline=discipline,
+                faculty=faculty,
+                student_name=st_name,
+                supervisor=supervisor,
+                slide_count=params.get("slide_count", session.params.get("slide_count", 8)),
                 include_images=include_images,
                 doc_context=doc_data,
                 reference_data=session.reference_data,
@@ -523,6 +560,9 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
                 prompt=pres_prompt,
                 system_instruction=ACADEMIC_HUMAN_SYSTEM_INSTRUCTION
             )
+            pres_data["author"] = st_name
+            pres_data["supervisor"] = supervisor
+            pres_data["faculty"] = faculty
             session.current_pres_data = pres_data
 
         # 3. Collect Image Queries & Fetch/Generate Images
@@ -582,13 +622,14 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
             caption = (
                 f"📄 **{doc_data.get('work_type', 'Реферат')} готов к сдаче!**\n"
                 f"• Тема: «{doc_data.get('topic')}»\n"
+                f"• Автор: {st_name} ({st_course} курс, гр. {group_full})\n"
                 f"• Стандарт: МГЭИ им. А.Д. Сахарова БГУ\n"
-                f"• Шрифт: Times New Roman 14 pt, 1.5 интервал\n"
                 f"• Оформление: ГОСТ 7.32 / ГОСТ 7.1-2003\n\n"
                 f"💬 *Вы можете написать в ответ любое сообщение, чтобы я внес правку (например: «добавь расчеты во 2 главу»)!*"
             )
-            await message.answer_document(
-                FSInputFile(docx_path),
+            await bot.send_document(
+                chat_id=chat_id,
+                document=FSInputFile(docx_path),
                 caption=caption,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=keyboard if not pptx_path else None
@@ -602,8 +643,9 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
                 f"• В каждый слайд встроены **заметки докладчика** для речи!\n\n"
                 f"💬 *Напишите правку в чат, если хотите что-то изменить!*"
             )
-            await message.answer_document(
-                FSInputFile(pptx_path),
+            await bot.send_document(
+                chat_id=chat_id,
+                document=FSInputFile(pptx_path),
                 caption=caption,
                 parse_mode=ParseMode.MARKDOWN,
                 reply_markup=keyboard
@@ -613,6 +655,12 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
         stop_event.set()
         logger.error(f"Generation error: {e}", exc_info=True)
         await status_msg.edit_text(f"❌ Произошла ошибка при генерации: {e}\n\nПопробуйте повторить или проверьте ключ API.")
+
+async def process_generation_request(message: types.Message, bot: Bot, params: Dict[str, Any]):
+    """Wrapper to launch generation from a Telegram Message or CallbackQuery."""
+    chat_id = message.chat.id
+    user_id = int(params.get("user_id") or (message.from_user.id if not message.from_user.is_bot else chat_id))
+    await process_generation_by_user(user_id=user_id, chat_id=chat_id, bot=bot, params=params)
 
 async def process_revision_request(message: types.Message, bot: Bot, session: UserSession, instruction: str):
     """Iteratively revise current DOCX or PPTX according to student instructions."""
@@ -777,13 +825,19 @@ async def main():
         print("="*60 + "\n")
         return
 
+    bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+
+    async def _webapp_generate_cb(user_id: int, params: Dict[str, Any]):
+        await process_generation_by_user(user_id=user_id, chat_id=user_id, bot=bot, params=params)
+
+    webapp_server.set_generate_callback(_webapp_generate_cb)
+
     # Start WebApp server in background
     try:
         await webapp_server.start_webapp_server()
     except Exception as e:
         logger.warning(f"Could not start WebApp server: {e}")
 
-    bot = Bot(token=TELEGRAM_BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     logger.info("Bot starting polling...")
     await dp.start_polling(bot)
 
