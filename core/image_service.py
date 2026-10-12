@@ -39,7 +39,14 @@ class ImageService:
         q_hash = hashlib.md5(clean_query.lower().encode("utf-8")).hexdigest()
         cached_file = IMAGES_CACHE_DIR / f"img_{q_hash}.jpg"
         if cached_file.exists() and cached_file.stat().st_size > 8000:
-            return cached_file
+            try:
+                with Image.open(cached_file) as c_img:
+                    if cls._is_valid_academic_image(c_img):
+                        return cached_file
+                # If cached image was bad/black, remove it
+                cached_file.unlink(missing_ok=True)
+            except Exception:
+                cached_file.unlink(missing_ok=True)
 
         search_variants = cls._extract_search_variants(clean_query)
         logger.info(f"ImageService: searching image for '{clean_query}'. Variants: {search_variants}")
@@ -228,8 +235,39 @@ class ImageService:
         return None
 
     @classmethod
+    def _is_valid_academic_image(cls, img: Image.Image) -> bool:
+        """Validate that the image is not a black rectangle, solid color, or low-quality icon."""
+        if img.width < 300 or img.height < 200:
+            return False
+
+        gray = img.convert("L")
+        # Sample pixels for fast verification
+        small = gray.resize((100, 100))
+        pixels = list(small.tobytes())
+        total = len(pixels)
+        if total == 0:
+            return False
+
+        # Reject if more than 35% pitch black pixels
+        black_count = sum(1 for p in pixels if p < 25)
+        if (black_count / total) > 0.35:
+            return False
+
+        # Reject if average brightness is too dark (< 45) or completely blank white (> 253)
+        avg_brightness = sum(pixels) / total
+        if avg_brightness < 45 or avg_brightness > 253:
+            return False
+
+        # Reject if contrast is too low (e.g. solid single color or blank grey box)
+        min_val, max_val = gray.getextrema()
+        if (max_val - min_val) < 40:
+            return False
+
+        return True
+
+    @classmethod
     async def _download_and_save(cls, session: aiohttp.ClientSession, url: str, target_file: Path) -> bool:
-        """Download image, validate via Pillow, and save as crisp JPEG."""
+        """Download image, composite transparency onto white, validate quality, auto-crop vertical images, and save as JPEG."""
         try:
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 if resp.status == 200:
@@ -237,21 +275,38 @@ class ImageService:
                     if len(raw_bytes) < 4000:
                         return False
 
-                    # Validate and convert with Pillow
-                    with Image.open(BytesIO(raw_bytes)) as img:
-                        # Reject tiny icons or thumbnails
-                        if img.width < 300 or img.height < 200:
+                    with Image.open(BytesIO(raw_bytes)) as raw_img:
+                        # 1. Composite transparent PNG/SVG onto solid white background so it NEVER turns black
+                        if raw_img.mode in ("RGBA", "LA") or (raw_img.mode == "P" and "transparency" in raw_img.info):
+                            alpha = raw_img.convert("RGBA")
+                            white_bg = Image.new("RGBA", alpha.size, (255, 255, 255, 255))
+                            img = Image.alpha_composite(white_bg, alpha).convert("RGB")
+                        else:
+                            img = raw_img.convert("RGB")
+
+                        # 2. Strict Academic Quality Filter (rejects black boxes, blank images, icons)
+                        if not cls._is_valid_academic_image(img):
+                            logger.info(f"ImageService: rejected image from {url} (failed quality/brightness check)")
                             return False
 
-                        img = img.convert("RGB")
-                        # Resize if excessively large
-                        max_dimension = 1400
-                        if img.width > max_dimension or img.height > max_dimension:
-                            img.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
+                        # 3. Auto-crop overly tall vertical images to compact landscape/square aspect ratio (max height = 0.9 * width)
+                        w, h = img.size
+                        if h > w:
+                            target_h = int(w * 0.85)
+                            top = (h - target_h) // 2
+                            bottom = top + target_h
+                            img = img.crop((0, top, w, bottom))
+                            logger.info(f"ImageService: auto-cropped tall vertical image from {w}x{h} to {img.width}x{img.height}")
+
+                        # 4. Resize if excessively large
+                        max_w, max_h = 1200, 800
+                        if img.width > max_w or img.height > max_h:
+                            img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
 
                         img.save(target_file, "JPEG", quality=90)
-                        logger.info(f"ImageService: successfully saved image ({img.width}x{img.height}) to {target_file}")
+                        logger.info(f"ImageService: saved validated image ({img.width}x{img.height}) to {target_file}")
                         return True
         except Exception as e:
             logger.debug(f"Failed to download image from {url}: {e}")
         return False
+

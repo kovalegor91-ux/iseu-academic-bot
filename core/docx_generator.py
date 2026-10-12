@@ -447,7 +447,21 @@ class DocxGenerator:
             p_img.paragraph_format.space_after = Pt(4)
             p_img.paragraph_format.first_line_indent = Cm(0)
             run_img = p_img.add_run()
-            run_img.add_picture(str(img_path), width=Inches(5.5))
+            # Determine appropriate size based on aspect ratio so image never exceeds 3.5 inches in height
+            from PIL import Image as PILImage
+            with PILImage.open(img_path) as im:
+                im_w, im_h = im.size
+
+            if im_h > im_w:
+                # Vertical/portrait image: cap height to 3.1 inches (~8 cm)
+                run_img.add_picture(str(img_path), height=Inches(3.1))
+            else:
+                # Landscape: ensure height never exceeds 3.4 inches
+                aspect = im_h / im_w
+                if 5.0 * aspect > 3.4:
+                    run_img.add_picture(str(img_path), height=Inches(3.4))
+                else:
+                    run_img.add_picture(str(img_path), width=Inches(5.0))
 
             # Figure Caption paragraph
             p_cap = doc.add_paragraph()
