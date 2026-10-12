@@ -39,11 +39,14 @@ def build_doc_generation_prompt(
     reference_data: Optional[Dict[str, Any]] = None,
     custom_rules: str = "",
     no_subsections: bool = False,
-    no_appendix: bool = False
+    no_appendix: bool = False,
+    knowledge_context: str = ""
 ) -> str:
     """Prompt to generate structured JSON for DOCX document."""
     ref_instruction = ""
-    if reference_data:
+    if knowledge_context:
+        ref_instruction = knowledge_context
+    elif reference_data:
         ref_instruction = f"""
 ВАЖНО! Пользователь загрузил эталонный документ (образец). Тебе необходимо максимально скопировать его стиль, терминологический аппарат и структуру:
 - Заголовки образца: {reference_data.get('headings', [])[:8]}
@@ -60,10 +63,10 @@ def build_doc_generation_prompt(
         rules_instruction += "\nТРЕБОВАНИЕ К ПРИЛОЖЕНИЯМ: НЕ создавай приложение А и речь для защиты (поле speech_text оставь пустым).\n"
 
     image_instruction = """
-Для каждого ключевого подраздела, где уместна иллюстрация, схема, график или таблица, укажи:
+Для каждого ключевого подраздела, где уместна иллюстрация, схема или график, укажи:
 "image_needed": true,
-"image_query": "точный поисковый запрос на русском/английском для поиска научной схемы или фото (например: 'схема биологической очистки сточных вод аэротенк')",
-"image_caption": "Название рисунка по ГОСТ (например: 'Принципиальная схема процесса биологической очистки сточных вод')"
+"image_query": "2-3 точных ключевых слова для поиска реальной схемы/фото на русском или английском (например: 'EU-TIRADS' или 'схема биоочистки')",
+"image_caption": "Точное научное название рисунка БЕЗ слова Рисунок и БЕЗ номера (например: 'Классификация узловых образований щитовидной железы')"
 """ if include_images else '"image_needed": false'
 
     return f"""
@@ -192,7 +195,8 @@ def build_presentation_prompt(
     include_images: bool = True,
     doc_context: Optional[Dict[str, Any]] = None,
     reference_data: Optional[Dict[str, Any]] = None,
-    custom_rules: str = ""
+    custom_rules: str = "",
+    knowledge_context: str = ""
 ) -> str:
     """Prompt to generate structured JSON for PPTX presentation."""
     context_str = ""
@@ -208,7 +212,9 @@ def build_presentation_prompt(
 """
 
     ref_str = ""
-    if reference_data:
+    if knowledge_context:
+        ref_str = knowledge_context
+    elif reference_data:
         ref_str = f"""
 Пользователь загрузил образец презентации:
 Слайды образца: {reference_data.get('slides', [])[:6]}

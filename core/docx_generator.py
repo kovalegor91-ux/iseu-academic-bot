@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -64,43 +65,72 @@ class DocxGenerator:
         except Exception as e:
             logger.debug(f"Could not set updateFields: {e}")
 
+        # 3. Read Section Inclusions
+        sec_cfg = doc_data.get("sections_config", {})
+        inc_title = doc_data.get("include_title_page", sec_cfg.get("title_page", True))
+        inc_toc = doc_data.get("include_toc", sec_cfg.get("toc", True))
+        inc_intro = doc_data.get("include_intro", sec_cfg.get("intro", True))
+        inc_body = doc_data.get("include_body", sec_cfg.get("body", True))
+        inc_concl = doc_data.get("include_conclusion", sec_cfg.get("conclusion", True))
+        inc_bib = doc_data.get("include_bibliography", sec_cfg.get("bibliography", True))
+        inc_app = doc_data.get("include_appendix", sec_cfg.get("appendix", not doc_data.get("no_appendix", False)))
+
+        has_prev_section = False
+
         # 4. Build Title Page
-        cls._build_title_page(doc, doc_data)
-        doc.add_page_break()
+        if inc_title:
+            cls._build_title_page(doc, doc_data)
+            has_prev_section = True
 
         # 5. Build Dynamic Table of Contents
-        cls._build_table_of_contents(doc, doc_data)
-        doc.add_page_break()
+        if inc_toc:
+            if has_prev_section:
+                doc.add_page_break()
+            cls._build_table_of_contents(doc, doc_data)
+            has_prev_section = True
 
         # 6. Build Introduction
-        cls._build_introduction(doc, doc_data)
-        doc.add_page_break()
+        if inc_intro:
+            if has_prev_section:
+                doc.add_page_break()
+            cls._build_introduction(doc, doc_data)
+            has_prev_section = True
 
         # 7. Build Main Sections & Subsections with Figures
-        figure_counter = 1
-        sections = doc_data.get("sections", [])
-        no_subs = doc_data.get("no_subsections", False)
-        for sec_idx, sec in enumerate(sections, 1):
-            cls._build_section(doc, sec, figure_counter, image_map, no_subsections=no_subs)
-            # Count figures added
-            for sub in sec.get("subsections", []):
-                if sub.get("image_needed") and sub.get("image_query") in image_map:
-                    figure_counter += 1
-            if sec_idx < len(sections):
-                doc.add_page_break()
-
-        doc.add_page_break()
+        if inc_body:
+            figure_counter = 1
+            sections = doc_data.get("sections", [])
+            no_subs = doc_data.get("no_subsections", False)
+            for sec_idx, sec in enumerate(sections, 1):
+                if has_prev_section and sec_idx == 1:
+                    doc.add_page_break()
+                cls._build_section(doc, sec, figure_counter, image_map, no_subsections=no_subs)
+                # Count figures added
+                for sub in sec.get("subsections", []):
+                    if sub.get("image_needed") and sub.get("image_query") in image_map:
+                        figure_counter += 1
+                if sec_idx < len(sections):
+                    doc.add_page_break()
+            has_prev_section = True
 
         # 8. Build Conclusion
-        cls._build_conclusion(doc, doc_data)
-        doc.add_page_break()
+        if inc_concl:
+            if has_prev_section:
+                doc.add_page_break()
+            cls._build_conclusion(doc, doc_data)
+            has_prev_section = True
 
         # 9. Build Bibliography (Список использованных источников)
-        cls._build_bibliography(doc, doc_data)
+        if inc_bib:
+            if has_prev_section:
+                doc.add_page_break()
+            cls._build_bibliography(doc, doc_data)
+            has_prev_section = True
 
-        # 10. If Speech Text exists, append as Appendix (unless user requested no_appendix)
-        if doc_data.get("speech_text") and not doc_data.get("no_appendix", False):
-            doc.add_page_break()
+        # 10. If Speech Text exists, append as Appendix
+        if inc_app and doc_data.get("speech_text") and not doc_data.get("no_appendix", False):
+            if has_prev_section:
+                doc.add_page_break()
             cls._build_speech_notes_appendix(doc, doc_data["speech_text"])
 
         # Save file
@@ -252,6 +282,7 @@ class DocxGenerator:
         """Build automatic dynamic Table of Contents with native Word field update."""
         p_title = doc.add_paragraph()
         p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_title.paragraph_format.space_before = Pt(0)
         p_title.paragraph_format.space_after = Pt(18)
         r = p_title.add_run("СОДЕРЖАНИЕ")
         r.font.name = 'Times New Roman'
@@ -261,43 +292,12 @@ class DocxGenerator:
         # Native Microsoft Word Dynamic TOC Field (updates automatically on open or F9/Update Field)
         p_fld = doc.add_paragraph()
         p_fld.paragraph_format.space_before = Pt(0)
-        p_fld.paragraph_format.space_after = Pt(8)
+        p_fld.paragraph_format.space_after = Pt(12)
         p_fld.paragraph_format.first_line_indent = Cm(0)
         r_fld = p_fld.add_run()
         fldSimple = OxmlElement('w:fldSimple')
         fldSimple.set(qn('w:instr'), r'TOC \o "1-2" \h \z \u')
         r_fld._r.append(fldSimple)
-
-        # Pre-rendered clean TOC lines for immediate display across all mobile/web viewers
-        no_subs = data.get("no_subsections", False)
-        no_app = data.get("no_appendix", False)
-
-        toc_items = ["ВВЕДЕНИЕ"]
-        for sec in data.get("sections", []):
-            sec_num = sec.get("number", "")
-            sec_title = sec.get("title", "")
-            toc_items.append(f"{sec_num} {sec_title}".upper())
-            if not no_subs:
-                for sub in sec.get("subsections", []):
-                    sub_num = sub.get("number", "")
-                    sub_title = sub.get("title", "")
-                    if sub_title:
-                        toc_items.append(f"  {sub_num} {sub_title}")
-        toc_items.append("ЗАКЛЮЧЕНИЕ")
-        toc_items.append("СПИСОК ИСПОЛЬЗОВАННЫХ ИСТОЧНИКОВ")
-        if data.get("speech_text") and not no_app:
-            toc_items.append("ПРИЛОЖЕНИЕ А. Тезисы доклада для защиты")
-
-        for item in toc_items:
-            p = doc.add_paragraph()
-            p.paragraph_format.line_spacing = 1.3
-            p.paragraph_format.space_before = Pt(0)
-            p.paragraph_format.space_after = Pt(3)
-            r = p.add_run(item)
-            r.font.name = 'Times New Roman'
-            r.font.size = Pt(13)
-            if item.isupper() and not item.startswith("  "):
-                r.bold = True
 
     @classmethod
     def _build_introduction(cls, doc: docx.Document, data: Dict[str, Any]):
@@ -374,14 +374,18 @@ class DocxGenerator:
         sec_num = sec.get("number", 1)
         sec_title = sec.get("title", "")
 
-        # Section Heading 1: 1 НАЗВАНИЕ ГЛАВЫ (all caps, bold, 14pt, center or indent)
+        # Section Heading 1: НАЗВАНИЕ ГЛАВЫ (all caps, bold, 14pt, center, without numbers)
         p_sec = doc.add_paragraph()
-        p_sec.paragraph_format.first_line_indent = Cm(1.25)
-        p_sec.paragraph_format.space_before = Pt(12)
+        p_sec.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p_sec.paragraph_format.first_line_indent = Cm(0)
+        p_sec.paragraph_format.space_before = Pt(14)
         p_sec.paragraph_format.space_after = Pt(12)
         p_sec.paragraph_format.line_spacing = 1.5
         cls._set_outline_level(p_sec, 0)
-        r_sec = p_sec.add_run(f"{sec_num} {sec_title}".upper())
+        
+        # Strip any leading numbers ("1 ", "1.", "Глава 1: ", etc.)
+        clean_title = re.sub(r"^(глава\s*)?\d*[\.\s\-—:]*", "", str(sec_title), flags=re.IGNORECASE).strip()
+        r_sec = p_sec.add_run(clean_title.upper())
         r_sec.font.name = 'Times New Roman'
         r_sec.font.size = Pt(14)
         r_sec.bold = True
@@ -451,7 +455,13 @@ class DocxGenerator:
             p_cap.paragraph_format.space_before = Pt(2)
             p_cap.paragraph_format.space_after = Pt(12)
             p_cap.paragraph_format.first_line_indent = Cm(0)
-            r_cap = p_cap.add_run(f"Рисунок {fig_number} — {caption}")
+
+            # Strip any preexisting 'Рисунок X —' or 'Рис. X' to prevent duplicates
+            clean_cap = re.sub(r"^(рисунок|рис\.?)\s*\d*\s*[-—–:]*\s*", "", str(caption), flags=re.IGNORECASE).strip()
+            clean_cap = re.sub(r"^(рисунок|рис\.?)\s*\d*\s*[-—–:]*\s*", "", clean_cap, flags=re.IGNORECASE).strip()
+            cap_text = f"Рисунок {fig_number} — {clean_cap}" if clean_cap else f"Рисунок {fig_number}"
+
+            r_cap = p_cap.add_run(cap_text)
             r_cap.font.name = 'Times New Roman'
             r_cap.font.size = Pt(12)
         except Exception as e:

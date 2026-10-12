@@ -306,3 +306,137 @@ input:checked + .slider:before {
   background: var(--accent-light);
   color: var(--accent);
 }
+
+/* Sections List Checklist */
+.sections-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.section-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f8faf8;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.section-item:hover {
+  border-color: var(--accent);
+  background: #f0f7f1;
+}
+
+.section-item input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.section-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.section-item-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.section-item-desc {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Attached Files List */
+.attached-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.attached-file-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--accent-light);
+  border: 1px solid rgba(46, 125, 50, 0.2);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.attached-file-badge .file-name {
+  flex: 1;
+  margin: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.file-remove-btn {
+  background: none;
+  border: none;
+  color: #d32f2f;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* Learning Modes Radio Group */
+.learning-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.learning-mode-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #fafafa;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.learning-mode-option:hover {
+  border-color: var(--accent);
+  background: #f5f9f6;
+}
+
+.learning-mode-option input[type="radio"] {
+  accent-color: var(--accent);
+  margin-top: 2px;
+}
+
+.learning-mode-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.learning-mode-text strong {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.learning-mode-text small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+

@@ -37,6 +37,7 @@ from core.image_service import ImageService
 from core.docx_generator import DocxGenerator
 from core.pptx_generator import PptxGenerator
 from core.session_manager import SessionManager, UserSession
+from core.knowledge_base import KnowledgeBase
 import webapp_server
 
 logging.basicConfig(
@@ -155,17 +156,18 @@ async def cmd_clear(message: types.Message):
 def format_rules_text(session: UserSession) -> str:
     sub_status = "❌ Включено (главы сплошным текстом)" if session.no_subsections else "✅ Выключено (разделы 1.1, 1.2 присутствуют)"
     app_status = "❌ Исключены (без речи и приложений)" if session.no_appendix else "✅ Включены (речь и приложения формируются)"
-    ref_status = f"✅ Загружен ({session.reference_data.get('type', 'файл').upper()})" if session.reference_data else "❌ Не загружен"
+    stats = KnowledgeBase.get_stats(session.user_id)
     rules_val = session.custom_rules if session.custom_rules else "Не заданы (стандартные требования МГЭИ)"
 
     return (
         "🎯 **Ваши индивидуальные условия и настройки генерации:**\n\n"
         f"• **Режим без подпунктов:** {sub_status}\n"
         f"• **Режим без приложений:** {app_status}\n"
-        f"• **Эталонный файл-образец:** {ref_status}\n"
+        f"• **Ваша библиотека образцов:** **{stats['user_docs']}** документов\n"
+        f"• **Общая база знаний института:** **{stats['global_docs']}** документов\n"
         f"• **Индивидуальные требования к содержанию:**\n"
         f"_{rules_val}_\n\n"
-        "💡 *Вы можете переключать параметры кнопками ниже или задать их через «Конструктор работы».*\n"
+        "💡 *Вы можете прикрепить файлы `.docx`/`.pptx` для непрерывного обучения бота или задать параметры в WebApp.*\n"
         "Чтобы задать требования прямо в чате, напишите:\n`Правила: ваши требования`"
     )
 
@@ -233,7 +235,7 @@ async def cb_clear_custom_rules(call: types.CallbackQuery):
 
 @dp.message(F.document)
 async def handle_document(message: types.Message, bot: Bot):
-    """Handle uploaded reference document (.docx or .pptx) for style cloning."""
+    """Handle uploaded reference document (.docx or .pptx) for learning and style cloning."""
     doc = message.document
     fname = doc.file_name.lower()
     if not (fname.endswith(".docx") or fname.endswith(".pptx")):
@@ -241,17 +243,24 @@ async def handle_document(message: types.Message, bot: Bot):
         return
 
     user_id = message.from_user.id
-    status_msg = await message.answer("⏳ Анализирую присланный файл-образец...")
+    status_msg = await message.answer(f"⏳ Анализирую и добавляю в базу знаний документ «{doc.file_name}»...")
 
     try:
         temp_dir = OUTPUT_DIR / "uploads"
         temp_dir.mkdir(parents=True, exist_ok=True)
         local_path = temp_dir / f"ref_{user_id}_{doc.file_name}"
-        
+
         file_info = await bot.get_file(doc.file_id)
         await bot.download_file(file_info.file_path, local_path)
 
-        ref_data = ReferenceParser.parse_file(local_path)
+        with open(local_path, "rb") as f:
+            file_bytes = f.read()
+
+        # Add to persistent KnowledgeBase (both user's and global institute pool)
+        res = KnowledgeBase.add_document(user_id, doc.file_name, file_bytes)
+        ref_data = res["parsed"]
+        stats = res["stats"]
+
         session = SessionManager.get_session(user_id)
         session.reference_data = ref_data
         SessionManager.save_session(user_id)
@@ -260,13 +269,14 @@ async def handle_document(message: types.Message, bot: Bot):
         headings_cnt = len(ref_data.get("headings", [])) or ref_data.get("slide_count", 0)
 
         response_text = (
-            f"✅ **Эталонный образец успешно загружен и проанализирован!**\n\n"
-            f"• Формат: **{doc_type_str}**\n"
-            f"• Файл: `{doc.file_name}`\n"
-            f"• Обнаружено разделов/слайдов: **{headings_cnt}**\n"
-            f"• Шрифт: **{ref_data.get('font_name', 'Times New Roman')}**\n\n"
-            f"🎯 **Теперь все новые рефераты и презентации будут создаваться по подобию этого образца!**\n\n"
-            f"Напишите тему работы в чат или откройте «Конструктор работы»:"
+            f"✅ **Документ успешно добавлен в базу знаний и изучен нейросетью!**\n\n"
+            f"• Файл: `{doc.file_name}` ({doc_type_str})\n"
+            f"• Извлечено разделов / слайдов: **{headings_cnt}**\n"
+            f"• Шрифт и стилистика: **{ref_data.get('font_name', 'Times New Roman')}**\n\n"
+            f"📚 **Текущая база знаний:**\n"
+            f"• В вашей личной библиотеке: **{stats['user_docs']}** документов\n"
+            f"• В общей институтской базе МГЭИ: **{stats['global_docs']}** документов\n\n"
+            f"🎯 *Нейросеть непрерывно обучается на всех загруженных работах. Вы можете прислать ещё документы или начать генерацию новой работы прямо сейчас!*"
         )
         await status_msg.edit_text(response_text, parse_mode=ParseMode.MARKDOWN)
 
@@ -296,19 +306,18 @@ async def handle_webapp_data(message: types.Message, bot: Bot):
             if field in data and data[field]:
                 session.params[field] = data[field]
 
-        # Handle uploaded reference file from WebApp if present
-        ref_file = data.get("reference_file")
-        if ref_file and isinstance(ref_file, dict) and ref_file.get("base64"):
-            import base64
-            fname = ref_file.get("filename", "reference.docx")
-            temp_dir = OUTPUT_DIR / "uploads"
-            temp_dir.mkdir(parents=True, exist_ok=True)
-            local_path = temp_dir / f"ref_webapp_{user_id}_{fname}"
-            file_bytes = base64.b64decode(ref_file["base64"])
-            with open(local_path, "wb") as f:
-                f.write(file_bytes)
-            ref_data = ReferenceParser.parse_file(local_path)
-            session.reference_data = ref_data
+        # Handle multiple uploaded reference files from WebApp if present
+        ref_files = data.get("reference_files", [])
+        if not ref_files and data.get("reference_file"):
+            ref_files = [data["reference_file"]]
+
+        import base64
+        for rf in ref_files:
+            if isinstance(rf, dict) and rf.get("base64"):
+                fname = rf.get("filename", "reference.docx")
+                file_bytes = base64.b64decode(rf["base64"])
+                res = KnowledgeBase.add_document(user_id, fname, file_bytes)
+                session.reference_data = res["parsed"]
 
         SessionManager.save_session(user_id)
         await process_generation_request(message, bot, data)
@@ -444,6 +453,9 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
     custom_rules = params.get("custom_rules", session.custom_rules)
     no_subsections = params.get("no_subsections", session.no_subsections)
     no_appendix = params.get("no_appendix", session.no_appendix)
+    learning_mode = params.get("learning_mode", "my_docs")
+    sections_config = params.get("sections_config", {})
+    knowledge_context = KnowledgeBase.get_learning_context(user_id, mode=learning_mode)
 
     status_msg = await message.answer(
         f"⏳ **Генерация работы по стандартам МГЭИ им. А.Д. Сахарова:**\n\n"
@@ -480,7 +492,8 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
                 reference_data=session.reference_data,
                 custom_rules=custom_rules,
                 no_subsections=no_subsections,
-                no_appendix=no_appendix
+                no_appendix=no_appendix,
+                knowledge_context=knowledge_context
             )
             doc_data = await gemini.generate_json(
                 prompt=prompt,
@@ -488,6 +501,7 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
             )
             doc_data["no_subsections"] = no_subsections
             doc_data["no_appendix"] = no_appendix
+            doc_data["sections_config"] = sections_config
             session.current_doc_data = doc_data
 
         # 2. Generate PPTX data if requested
@@ -502,7 +516,8 @@ async def process_generation_request(message: types.Message, bot: Bot, params: D
                 include_images=include_images,
                 doc_context=doc_data,
                 reference_data=session.reference_data,
-                custom_rules=custom_rules
+                custom_rules=custom_rules,
+                knowledge_context=knowledge_context
             )
             pres_data = await gemini.generate_json(
                 prompt=pres_prompt,

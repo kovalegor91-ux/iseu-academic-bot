@@ -15,27 +15,6 @@
       <p>Генератор готовых рефератов, докладов и презентаций</p>
     </div>
 
-    <!-- Быстрые темы -->
-    <div class="card">
-      <div class="section-title">
-        <span>💡</span> Быстрые темы (нажмите для выбора)
-      </div>
-      <div class="chips-container">
-        <div class="chip" onclick="setTopic('Опухоли щитовидной железы. Этиология, патогенез, клинические проявления и диагностика', 'Экологическая медицина')">
-          🩺 Опухоли щитовидной железы
-        </div>
-        <div class="chip" onclick="setTopic('Радиационный мониторинг и радиологическая обстановка в Республике Беларусь', 'Радиобиология')">
-          ☢️ Радиационный мониторинг РБ
-        </div>
-        <div class="chip" onclick="setTopic('Методы биологической индикации качества атмосферного воздуха урбанизированных территорий', 'Экологический мониторинг')">
-          🌿 Биоиндикация воздуха
-        </div>
-        <div class="chip" onclick="setTopic('Современные подходы к обезвреживанию и утилизации медицинских отходов', 'Общая экология')">
-          ♻️ Утилизация медотходов
-        </div>
-      </div>
-    </div>
-
     <!-- Тип работы и тема -->
     <div class="card">
       <div class="section-title">
@@ -58,7 +37,7 @@
 
       <div class="form-group">
         <label for="topic">Тема работы *</label>
-        <textarea id="topic" rows="3" placeholder="Введите или выберите тему работы выше..." required></textarea>
+        <textarea id="topic" rows="3" placeholder="Введите тему научной работы..." required></textarea>
       </div>
 
       <div class="form-group">
@@ -67,7 +46,7 @@
       </div>
     </div>
 
-    <!-- Университет и кафедра -->
+    <!-- Факультет и кафедра -->
     <div class="card">
       <div class="section-title">
         <span>🏛️</span> Факультет и кафедра
@@ -138,7 +117,7 @@
     <!-- Детальные параметры работы -->
     <div class="card">
       <div class="section-title">
-        <span>⚙️</span> Детальные параметры документа
+        <span>⚙️</span> Параметры объема и иллюстраций
       </div>
 
       <div class="grid-2 form-group" id="volumeGroup">
@@ -152,78 +131,96 @@
         </div>
       </div>
 
-      <div class="grid-2 form-group">
-        <div>
-          <label for="chapters_count">Количество глав</label>
-          <select id="chapters_count">
-            <option value="2" selected>2 главы (Теория + Практика)</option>
-            <option value="3">3 главы (Теория + Анализ + Решения)</option>
-          </select>
-        </div>
-        <div>
-          <label for="complexity_level">Уровень работы</label>
-          <select id="complexity_level">
-            <option value="standard" selected>Стандартный академический</option>
-            <option value="advanced">Углубленный научный</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="toggle-group">
+      <div class="toggle-group" style="border-bottom: none; padding-bottom: 0;">
         <div class="toggle-info">
-          <div class="toggle-title">🖼️ Иллюстрации и схемы <span class="badge">ГОСТ</span></div>
-          <div class="toggle-desc">Поиск научных схем + AI с автоподписями «Рисунок 1 — ...»</div>
+          <div class="toggle-title">🖼️ Научные иллюстрации и схемы <span class="badge">ГОСТ</span></div>
+          <div class="toggle-desc">Поиск реальных схем (Википедия/Commons) с подписью «Рисунок 1 — ...»</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="include_images" checked>
           <span class="slider"></span>
         </label>
       </div>
+    </div>
 
-      <div class="toggle-group">
-        <div class="toggle-info">
-          <div class="toggle-title">🛡️ Человеческий язык <span class="badge">Anti-AI</span></div>
-          <div class="toggle-desc">Защита от антиплагиата: без клише, белорусская нормативная база</div>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="anti_ai_style" checked>
-          <span class="slider"></span>
-        </label>
+    <!-- Состав разделов документа -->
+    <div class="card">
+      <div class="section-title">
+        <span>📑</span> Состав разделов работы
       </div>
+      <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 12px;">
+        Выберите, какие разделы должны присутствовать в готовом документе:
+      </p>
 
-      <div class="toggle-group">
-        <div class="toggle-info">
-          <div class="toggle-title">🎤 Речь для защиты</div>
-          <div class="toggle-desc">Готовый текст доклада и Speaker Notes к каждому слайду</div>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="generate_speech" checked>
-          <span class="slider"></span>
+      <div class="sections-list">
+        <label class="section-item">
+          <div class="section-item-info">
+            <span class="section-item-title">Титульный лист</span>
+            <span class="section-item-desc">Официальный бланк МГЭИ БГУ (Минск, 2026)</span>
+          </div>
+          <input type="checkbox" id="sec_title_page" checked>
         </label>
-      </div>
 
-      <div class="toggle-group">
-        <div class="toggle-info">
-          <div class="toggle-title">📚 Литература ВАК РБ</div>
-          <div class="toggle-desc">Список источников строго по ГОСТ 7.1-2003 со ссылками [1, с. 24]</div>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="gost_bibliography" checked>
-          <span class="slider"></span>
+        <label class="section-item">
+          <div class="section-item-info">
+            <span class="section-item-title">Содержание</span>
+            <span class="section-item-desc">Динамическое оглавление Word с автономерами (F9)</span>
+          </div>
+          <input type="checkbox" id="sec_toc" checked>
+        </label>
+
+        <label class="section-item">
+          <div class="section-item-info">
+            <span class="section-item-title">Введение</span>
+            <span class="section-item-desc">Актуальность, цель, задачи, объект и предмет</span>
+          </div>
+          <input type="checkbox" id="sec_intro" checked>
+        </label>
+
+        <label class="section-item">
+          <div class="section-item-info">
+            <span class="section-item-title">Основная часть (главы)</span>
+            <span class="section-item-desc">Теоретический и практический научный анализ</span>
+          </div>
+          <input type="checkbox" id="sec_body" checked>
+        </label>
+
+        <label class="section-item">
+          <div class="section-item-info">
+            <span class="section-item-title">Заключение</span>
+            <span class="section-item-desc">Академические выводы по поставленным задачам</span>
+          </div>
+          <input type="checkbox" id="sec_conclusion" checked>
+        </label>
+
+        <label class="section-item">
+          <div class="section-item-info">
+            <span class="section-item-title">Список использованных источников</span>
+            <span class="section-item-desc">Библиография по ГОСТ 7.1-2003 / ВАК Беларуси со ссылками [1]</span>
+          </div>
+          <input type="checkbox" id="sec_bibliography" checked>
+        </label>
+
+        <label class="section-item">
+          <div class="section-item-info">
+            <span class="section-item-title">Приложения / Речь для защиты</span>
+            <span class="section-item-desc">Готовый доклад студента на 4-6 минут выступления</span>
+          </div>
+          <input type="checkbox" id="sec_appendix" checked>
         </label>
       </div>
     </div>
 
-    <!-- Особые требования и файл-образец -->
+    <!-- Особые требования и обучающие документы -->
     <div class="card">
       <div class="section-title">
-        <span>🎯</span> Ваши особые условия и образец
+        <span>🎯</span> Ваши особые условия и образцы
       </div>
 
       <div class="toggle-group">
         <div class="toggle-info">
-          <div class="toggle-title">🚫 Без подпунктов</div>
-          <div class="toggle-desc">Писать главы сплошным текстом без разделов 1.1, 1.2</div>
+          <div class="toggle-title">🚫 Главы без подпунктов</div>
+          <div class="toggle-desc">Писать главы сплошным текстом без подразделов 1.1, 1.2</div>
         </div>
         <label class="switch">
           <input type="checkbox" id="no_subsections">
@@ -231,33 +228,53 @@
         </label>
       </div>
 
-      <div class="toggle-group">
-        <div class="toggle-info">
-          <div class="toggle-title">🚫 Без приложений</div>
-          <div class="toggle-desc">Не добавлять речь докладчика и приложение в конец DOCX</div>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="no_appendix">
-          <span class="slider"></span>
-        </label>
-      </div>
-
       <div class="form-group" style="margin-top: 10px;">
         <label for="custom_rules">Индивидуальные требования к содержанию</label>
-        <textarea id="custom_rules" rows="2" placeholder="Например: без таблиц, больше расчетов, акцент на этиологию, использовать законы РБ..."></textarea>
+        <textarea id="custom_rules" rows="2" placeholder="Например: без таблиц, больше расчетов, акцент на нормативную базу РБ, статистика 2024 г..."></textarea>
       </div>
 
+      <!-- База образцов и обучение -->
       <div class="form-group">
-        <label>📁 Документ-образец (.docx / .pptx) для клонирования стиля</label>
+        <label>📚 Документы-образцы (.docx / .pptx) для обучения стилю</label>
         <div class="file-upload-box" onclick="document.getElementById('refFileInput').click()">
-          <span id="fileUploadText">📎 Нажмите, чтобы прикрепить образец</span>
-          <input type="file" id="refFileInput" accept=".docx,.pptx" style="display: none;" onchange="handleFileSelect(this)">
+          <span id="fileUploadText">📎 Нажмите, чтобы прикрепить один или несколько файлов (.docx / .pptx)</span>
+          <input type="file" id="refFileInput" accept=".docx,.pptx" multiple style="display: none;" onchange="handleMultipleFilesSelect(this)">
+        </div>
+
+        <div id="attachedFilesList" class="attached-files-list"></div>
+      </div>
+
+      <!-- Источник обучения -->
+      <div class="form-group" style="margin-top: 12px;">
+        <label>Режим обучения и клонирования стиля:</label>
+        <div class="learning-modes">
+          <label class="learning-mode-option">
+            <input type="radio" name="learning_mode" value="my_docs" checked>
+            <div class="learning-mode-text">
+              <strong>👤 На основе моих документов</strong>
+              <small>Только те файлы, которые вы загрузили в бота</small>
+            </div>
+          </label>
+          <label class="learning-mode-option">
+            <input type="radio" name="learning_mode" value="global_docs">
+            <div class="learning-mode-text">
+              <strong>🏛️ На основе общей базы знаний МГЭИ</strong>
+              <small>Обучение на всех работах студентов института</small>
+            </div>
+          </label>
+          <label class="learning-mode-option">
+            <input type="radio" name="learning_mode" value="standard">
+            <div class="learning-mode-text">
+              <strong>📋 Стандартный ГОСТ МГЭИ</strong>
+              <small>Базовые государственные требования без образцов</small>
+            </div>
+          </label>
         </div>
       </div>
 
-      <div class="toggle-group" style="border-bottom: none; padding-top: 4px;">
+      <div class="toggle-group" style="border-bottom: none; padding-top: 6px;">
         <div class="toggle-info">
-          <div class="toggle-title">💾 Запомнить эти правила</div>
+          <div class="toggle-title">💾 Запомнить мои настройки</div>
           <div class="toggle-desc">Автоматически применять ко всем моим работам</div>
         </div>
         <label class="switch">
@@ -294,22 +311,57 @@
     };
 
     let selectedType = "doc";
-    let selectedRefFile = null;
+    let attachedFiles = []; // Array of { filename, base64, size }
 
-    function handleFileSelect(input) {
-      if (input.files && input.files[0]) {
-        const file = input.files[0];
+    function handleMultipleFilesSelect(input) {
+      if (!input.files || input.files.length === 0) return;
+
+      Array.from(input.files).forEach(file => {
         const reader = new FileReader();
         reader.onload = function(e) {
           const b64 = e.target.result.split(',')[1];
-          selectedRefFile = {
-            filename: file.name,
-            base64: b64
-          };
-          document.getElementById("fileUploadText").innerHTML = "✅ Образец прикреплен: <b>" + file.name + "</b>";
+          // Check if already in list
+          if (!attachedFiles.some(f => f.filename === file.name)) {
+            attachedFiles.push({
+              filename: file.name,
+              base64: b64,
+              size: file.size
+            });
+            renderAttachedFiles();
+          }
         };
         reader.readAsDataURL(file);
+      });
+      input.value = ""; // Reset input so same file can be re-selected if needed
+    }
+
+    function removeFile(index) {
+      attachedFiles.splice(index, 1);
+      renderAttachedFiles();
+    }
+
+    function renderAttachedFiles() {
+      const container = document.getElementById("attachedFilesList");
+      if (attachedFiles.length === 0) {
+        container.innerHTML = "";
+        document.getElementById("fileUploadText").innerHTML = "📎 Нажмите, чтобы прикрепить один или несколько файлов (.docx / .pptx)";
+        return;
       }
+
+      document.getElementById("fileUploadText").innerHTML = `✅ Прикреплено файлов: <b>${attachedFiles.length}</b>. Нажмите, чтобы добавить ещё.`;
+      let html = "";
+      attachedFiles.forEach((file, idx) => {
+        const kbSize = Math.round(file.size / 1024);
+        const icon = file.filename.endsWith(".pptx") ? "📊" : "📄";
+        html += `
+          <div class="attached-file-badge">
+            <span class="file-icon">${icon}</span>
+            <span class="file-name" title="${file.filename}">${file.filename} (${kbSize} КБ)</span>
+            <button type="button" class="file-remove-btn" onclick="removeFile(${idx})">×</button>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
     }
 
     function updateDepartments() {
@@ -336,14 +388,6 @@
       }
     }
 
-    function setTopic(topic, discipline) {
-      document.getElementById("topic").value = topic;
-      if (discipline) {
-        document.getElementById("discipline").value = discipline;
-      }
-      document.getElementById("topic").focus();
-    }
-
     function selectType(type, element) {
       selectedType = type;
       document.querySelectorAll(".work-type-btn").forEach(btn => btn.classList.remove("active"));
@@ -363,9 +407,6 @@
         if (savedRules) document.getElementById("custom_rules").value = savedRules;
         if (localStorage.getItem("iseu_no_subsections") === "true") {
           document.getElementById("no_subsections").checked = true;
-        }
-        if (localStorage.getItem("iseu_no_appendix") === "true") {
-          document.getElementById("no_appendix").checked = true;
         }
         const savedName = localStorage.getItem("iseu_student_name");
         if (savedName) document.getElementById("student_name").value = savedName;
@@ -390,14 +431,27 @@
 
       const customRules = document.getElementById("custom_rules").value.trim();
       const noSubsections = document.getElementById("no_subsections").checked;
-      const noAppendix = document.getElementById("no_appendix").checked;
+
+      // Section Inclusions
+      const sectionsConfig = {
+        title_page: document.getElementById("sec_title_page").checked,
+        toc: document.getElementById("sec_toc").checked,
+        intro: document.getElementById("sec_intro").checked,
+        body: document.getElementById("sec_body").checked,
+        conclusion: document.getElementById("sec_conclusion").checked,
+        bibliography: document.getElementById("sec_bibliography").checked,
+        appendix: document.getElementById("sec_appendix").checked
+      };
+
+      // Learning mode
+      const learningModeRadio = document.querySelector('input[name="learning_mode"]:checked');
+      const learningMode = learningModeRadio ? learningModeRadio.value : "my_docs";
 
       // Save preferences if checkbox enabled
       if (document.getElementById("save_rules_pref").checked) {
         try {
           localStorage.setItem("iseu_custom_rules", customRules);
           localStorage.setItem("iseu_no_subsections", noSubsections);
-          localStorage.setItem("iseu_no_appendix", noAppendix);
           localStorage.setItem("iseu_student_name", document.getElementById("student_name").value.trim());
           localStorage.setItem("iseu_supervisor", document.getElementById("supervisor").value.trim());
         } catch (e) {}
@@ -421,16 +475,16 @@
         supervisor: document.getElementById("supervisor").value.trim() || "доцент Петров П.П.",
         page_count: parseInt(document.getElementById("page_count").value) || 15,
         slide_count: parseInt(document.getElementById("slide_count").value) || 8,
-        chapters_count: parseInt(document.getElementById("chapters_count").value) || 2,
-        complexity_level: document.getElementById("complexity_level").value,
         include_images: document.getElementById("include_images").checked,
-        anti_ai_style: document.getElementById("anti_ai_style").checked,
-        generate_speech: document.getElementById("generate_speech").checked,
-        gost_bibliography: document.getElementById("gost_bibliography").checked,
+        anti_ai_style: true,
+        generate_speech: sectionsConfig.appendix,
+        gost_bibliography: true,
         custom_rules: customRules,
         no_subsections: noSubsections,
-        no_appendix: noAppendix,
-        reference_file: selectedRefFile
+        no_appendix: !sectionsConfig.appendix,
+        sections_config: sectionsConfig,
+        learning_mode: learningMode,
+        reference_files: attachedFiles
       };
 
       if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.sendData) {
