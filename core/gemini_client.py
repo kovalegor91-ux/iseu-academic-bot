@@ -103,9 +103,9 @@ class GeminiClient:
         models_to_try = [
             model_override or self.model,
             "gemini-flash-latest",
-            "gemini-2.5-flash",
-            "gemini-pro-latest",
-            "gemini-2.0-flash"
+            "gemini-flash-lite-latest",
+            "gemini-3.5-flash-lite",
+            "gemini-pro-latest"
         ]
         unique_models = list(dict.fromkeys(models_to_try))
 
@@ -135,10 +135,11 @@ class GeminiClient:
                                 payload["generationConfig"]["maxOutputTokens"] = 8192
                                 continue
                             elif response.status in (429, 503):
-                                logger.warning(f"Status {response.status} on model {model}, attempt {attempt+1}. Falling back...")
-                                if attempt == 0:
-                                    await asyncio.sleep(1)
-                                    continue
+                                logger.warning(f"Status {response.status} on model {model}, attempt {attempt+1}/3. Waiting...")
+                                await asyncio.sleep(1.5 * (attempt + 1))
+                                continue
+                            elif response.status == 404:
+                                logger.warning(f"Model {model} returned 404. Skipping to fallback model...")
                                 break
                             else:
                                 error_text = await response.text()
@@ -148,7 +149,7 @@ class GeminiClient:
                 except Exception as e:
                     logger.warning(f"Connection exception on {model}, attempt {attempt+1}: {e}")
                     last_error = str(e)
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(1.5)
 
         raise RuntimeError(f"Не удалось получить ответ от Gemini API: {last_error}")
 
