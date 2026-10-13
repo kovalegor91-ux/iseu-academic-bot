@@ -10,7 +10,7 @@ load_dotenv(BASE_DIR / ".env")
 # API Keys & Bot Config
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
 
 # WebApp Configuration (Render.com compatibility)
 WEBAPP_HOST = os.getenv("WEBAPP_HOST", "0.0.0.0")

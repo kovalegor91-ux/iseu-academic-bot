@@ -80,6 +80,9 @@ class GeminiClient:
         generation_config = {
             "temperature": temperature,
             "maxOutputTokens": max_output_tokens,
+            "thinkingConfig": {
+                "thinkingBudget": -1  # High reasoning effort
+            }
         }
         if json_mode:
             generation_config["responseMimeType"] = "application/json"
@@ -100,12 +103,11 @@ class GeminiClient:
         if not self.api_key:
             raise ValueError("GEMINI_API_KEY не установлен. Укажите ключ в файле .env")
 
+        primary = model_override or self.model or "gemini-3.8-flash"
         models_to_try = [
-            model_override or self.model,
-            "gemini-flash-latest",
-            "gemini-flash-lite-latest",
-            "gemini-3.5-flash-lite",
-            "gemini-pro-latest"
+            primary,
+            "gemini-3.8-flash",
+            "gemini-flash-latest"
         ]
         unique_models = list(dict.fromkeys(models_to_try))
 
